@@ -637,29 +637,30 @@
                                        class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500">
                             </div>
                             
-                            <!-- 開始時間與結束時間 -->
+                            <!-- 下班時間與打卡時間 -->
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label data-i18n="OVERTIME_START_TIME_LABEL" 
-                                           for="overtime-start-time" 
+                                    <label for="overtime-start-time"
                                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        開始時間
+                                        排班下班時間
                                     </label>
-                                    <input type="time" 
-                                           id="overtime-start-time" 
+                                    <input type="time"
+                                           id="overtime-start-time"
                                            class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500">
                                 </div>
                                 <div>
-                                    <label data-i18n="OVERTIME_END_TIME_LABEL" 
-                                           for="overtime-end-time" 
+                                    <label for="overtime-end-time"
                                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        結束時間
+                                        實際打卡時間
                                     </label>
-                                    <input type="time" 
-                                           id="overtime-end-time" 
+                                    <input type="time"
+                                           id="overtime-end-time"
                                            class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500">
                                 </div>
                             </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 -mt-2">
+                                下班後超過30分鐘才開始計算，每30分鐘計0.5小時
+                            </p>
                             
                             <!-- 加班時數 -->
                             <div>

@@ -247,20 +247,23 @@ function bindOvertimeFormEvents() {
     
     if (startTimeInput && endTimeInput) {
         const calculateHours = () => {
-            const start = startTimeInput.value;
-            const end = endTimeInput.value;
-            
+            const start = startTimeInput.value; // 下班時間（排班結束）
+            const end = endTimeInput.value;     // 實際打卡時間
+
             if (start && end) {
-                const startHour = parseInt(start.split(':')[0]);
-                const startMin = parseInt(start.split(':')[1]);
-                const endHour = parseInt(end.split(':')[0]);
-                const endMin = parseInt(end.split(':')[1]);
-                
-                let hours = (endHour - startHour) + (endMin - startMin) / 60;
-                
-                if (hours < 0) hours += 24; // 跨日計算
-                
-                document.getElementById('overtime-hours').value = hours.toFixed(1);
+                const startTotalMin = parseInt(start.split(':')[0]) * 60 + parseInt(start.split(':')[1]);
+                const endTotalMin = parseInt(end.split(':')[0]) * 60 + parseInt(end.split(':')[1]);
+
+                let diffMin = endTotalMin - startTotalMin;
+                if (diffMin < 0) diffMin += 24 * 60; // 跨日計算
+
+                // 規則：下班後超過30分鐘才算加班，之後每30分鐘計0.5小時
+                let overtimeHours = 0;
+                if (diffMin > 30) {
+                    overtimeHours = Math.floor((diffMin - 30) / 30) * 0.5;
+                }
+
+                document.getElementById('overtime-hours').value = overtimeHours.toFixed(1);
             }
         };
         
