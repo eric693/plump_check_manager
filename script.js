@@ -1439,22 +1439,19 @@ async function renderDailyRecords(dateKey) {
                                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
                                         </svg>
                                         <h4 class="text-sm font-bold text-orange-800 dark:text-orange-300">
-                                            偵測到加班時數
+                                            偵測到可能有加班
                                         </h4>
                                     </div>
                                     <div class="ml-7 space-y-1">
                                         <p class="text-sm text-orange-700 dark:text-orange-400">
-                                            <span class="font-semibold">總工時：</span>${workHoursDecimal.toFixed(2)} 小時
+                                            <span class="font-semibold">下班打卡：</span>${punchOutRecord.time}
                                         </p>
                                         <p class="text-sm text-orange-700 dark:text-orange-400">
-                                            <span class="font-semibold">標準工時：</span>8 小時（已扣除午休 1 小時）
-                                        </p>
-                                        <p class="text-sm font-bold text-orange-800 dark:text-orange-200">
-                                            <span class="text-orange-600 dark:text-orange-400"> 加班時數：</span>${overtimeHours.toFixed(2)} 小時
+                                            實際加班時數需填入「排班下班時間」後由系統計算
                                         </p>
                                     </div>
                                 </div>
-                                <button 
+                                <button
                                     onclick="quickApplyOvertime('${recordData.date}', '${punchInRecord.time}', '${punchOutRecord.time}', ${overtimeHours.toFixed(2)})"
                                     class="ml-4 px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 flex items-center space-x-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -202,8 +202,9 @@ function renderOvertimeRecords(requests, container) {
                 <div>
                     <p class="font-semibold text-gray-800 dark:text-white">${req.overtimeDate}</p>
                     <p class="text-sm text-gray-600 dark:text-gray-400">
-                        ${startTime} - ${endTime} (${hours}小時)
+                        排班下班：${startTime} ｜ 打卡：${endTime}
                     </p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">加班時數：${hours} 小時</p>
                     ${compHours > 0 ? `
                         <p class="text-sm text-orange-600 dark:text-orange-400 font-semibold mt-1">
                             補休時數：${compHours} 小時
@@ -289,14 +290,14 @@ async function handleOvertimeSubmit() {
     const hours = parseFloat(hoursInput.value);
     const reason = reasonInput.value;
     
-    // 驗證
-    if (!overtimeDate || !startTime || !endTime || !hours || !reason) {
+    // 驗證必填欄位
+    if (!overtimeDate || !startTime || !endTime || !reason) {
         showNotification(t('OVERTIME_FILL_ALL_FIELDS') || '請填寫所有欄位', 'error');
         return;
     }
-    
-    if (hours <= 0) {
-        showNotification(t('OVERTIME_INVALID_HOURS') || '加班時數必須大於0', 'error');
+
+    if (isNaN(hours) || hours <= 0) {
+        showNotification('下班後未超過30分鐘，不符合加班條件（請確認排班下班時間與打卡時間是否正確）', 'error');
         return;
     }
     
@@ -331,18 +332,18 @@ async function submitOvertimeRequest(overtimeDate, startTime, endTime, hours, re
         
         if (res.ok) {
             showNotification(t('OVERTIME_SUBMIT_SUCCESS') || '加班申請提交成功', 'success');
-            
+
             // 清空表單
             document.getElementById('overtime-date').value = '';
             document.getElementById('overtime-start-time').value = '';
             document.getElementById('overtime-end-time').value = '';
             document.getElementById('overtime-hours').value = '';
             document.getElementById('overtime-reason').value = '';
-            
+
             // 重新載入記錄
             await loadEmployeeOvertimeRecords();
         } else {
-            showNotification(t(res.code) || t('ERROR_SUBMIT_OVERTIME') || '提交失敗', 'error');
+            showNotification(t(res.code) || res.msg || t('ERROR_SUBMIT_OVERTIME') || '提交失敗', 'error');
         }
     } catch (err) {
         console.error(err);
@@ -576,7 +577,10 @@ function renderPendingOvertimeRequests(requests, container) {
                     <div>
                         <p class="font-semibold text-gray-800 dark:text-white">${req.employeeName}</p>
                         <p class="text-sm text-gray-600 dark:text-gray-400">
-                            ${req.overtimeDate} | ${startTime} - ${endTime}
+                            ${req.overtimeDate}
+                        </p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                            排班下班：${startTime} ｜ 打卡：${endTime}
                         </p>
                         <p class="text-sm text-indigo-600 dark:text-indigo-400">
                             <strong data-i18n="OVERTIME_HOURS_LABEL">加班時數：</strong>${hours} 小時
