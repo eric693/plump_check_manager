@@ -307,9 +307,14 @@ function setEmployeeSalaryTW(salaryData) {
     const sheet = getEmployeeSalarySheet();
     const data = sheet.getDataRange().getValues();
     
-    // 驗證必填欄位
-    if (!salaryData.employeeId || !salaryData.employeeName || !salaryData.baseSalary || salaryData.baseSalary <= 0) {
-      return { success: false, message: "缺少必填欄位或基本薪資無效" };
+    // 驗證必填欄位（時薪員工的 baseSalary 為時薪，允許為 0；月薪員工需 > 0）
+    const salaryTypeForCheck = String(salaryData.salaryType || '月薪').trim();
+    const isHourlyCheck = (salaryTypeForCheck === '時薪');
+    if (!salaryData.employeeId || !salaryData.employeeName) {
+      return { success: false, message: "缺少必填欄位（員工ID 或姓名）" };
+    }
+    if (!isHourlyCheck && (!salaryData.baseSalary || salaryData.baseSalary <= 0)) {
+      return { success: false, message: "月薪員工的基本薪資必須大於 0" };
     }
     
     // ⭐⭐⭐ 修正：安全地轉換數值（允許 0）

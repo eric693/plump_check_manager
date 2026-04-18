@@ -28,11 +28,40 @@ function initOvertimeSheet() {
   return sheet;
 }
 
+/**
+ * 後端計算加班時數（下班後超過30分鐘才起算，每30分鐘=0.5小時）
+ */
+function calculateOvertimeHoursFromTimes_(startTimeStr, endTimeStr) {
+  const startParts = String(startTimeStr).split(':');
+  const endParts = String(endTimeStr).split(':');
+  if (startParts.length < 2 || endParts.length < 2) return 0;
+  const startMin = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+  const endMin = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+  let diffMin = endMin - startMin;
+  if (diffMin < 0) diffMin += 24 * 60;
+  if (diffMin > 30) {
+    return Math.floor((diffMin - 30) / 30) * 0.5;
+  }
+  return 0;
+}
+
 function submitOvertimeRequest(sessionToken, overtimeDate, startTime, endTime, hours, reason, compensatoryHours) {
   const employee = checkSession_(sessionToken);
   const user = employee.user;
   if (!user) return { ok: false, code: "ERR_SESSION_INVALID" };
-  
+
+  // 後端重新計算加班時數，不信任前端傳入的 hours
+  const calculatedHours = calculateOvertimeHoursFromTimes_(startTime, endTime);
+  Logger.log(`🔢 後端計算加班時數: startTime=${startTime}, endTime=${endTime}, calculatedHours=${calculatedHours} (前端傳入=${hours})`);
+
+  if (calculatedHours <= 0) {
+    return {
+      ok: false,
+      code: "ERR_NO_OVERTIME",
+      msg: "下班後未超過30分鐘，不符合加班申請條件"
+    };
+  }
+
   const sheet = initOvertimeSheet();
   
   // ✅ 防重複提交
@@ -65,9 +94,9 @@ function submitOvertimeRequest(sessionToken, overtimeDate, startTime, endTime, h
   const endDateTime = new Date(`${overtimeDate}T${endTime}:00`);
   
   const compHours = parseFloat(compensatoryHours) || 0;
-  
-  Logger.log(`📝 提交加班: ${user.name}, 日期=${overtimeDate}, 時數=${hours}, 補休=${compHours}`);
-  
+
+  Logger.log(`📝 提交加班: ${user.name}, 日期=${overtimeDate}, 時數=${calculatedHours}, 補休=${compHours}`);
+
   const row = [
     requestId,
     user.userId,
@@ -75,7 +104,7 @@ function submitOvertimeRequest(sessionToken, overtimeDate, startTime, endTime, h
     overtimeDate,
     startDateTime,
     endDateTime,
-    parseFloat(hours),
+    calculatedHours,
     reason,
     new Date(),
     "pending",
@@ -92,7 +121,7 @@ function submitOvertimeRequest(sessionToken, overtimeDate, startTime, endTime, h
       overtimeDate,
       startTime,
       endTime,
-      parseFloat(hours),
+      calculatedHours,
       reason
     );
     Logger.log(`✅ 已通知管理員：${user.name} 提交加班申請`);
