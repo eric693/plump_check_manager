@@ -258,10 +258,10 @@ function bindOvertimeFormEvents() {
                 let diffMin = endTotalMin - startTotalMin;
                 if (diffMin < 0) diffMin += 24 * 60; // 跨日計算
 
-                // 規則：下班後超過30分鐘才算加班，之後每30分鐘計0.5小時
+                // 規則：滿30分鐘計0.5小時，滿60分鐘計1小時，以此類推
                 let overtimeHours = 0;
-                if (diffMin > 30) {
-                    overtimeHours = Math.floor((diffMin - 30) / 30) * 0.5;
+                if (diffMin >= 30) {
+                    overtimeHours = Math.floor(diffMin / 30) * 0.5;
                 }
 
                 document.getElementById('overtime-hours').value = overtimeHours.toFixed(1);
@@ -297,7 +297,7 @@ async function handleOvertimeSubmit() {
     }
 
     if (isNaN(hours) || hours <= 0) {
-        showNotification('下班後未超過30分鐘，不符合加班條件（請確認排班下班時間與打卡時間是否正確）', 'error');
+        showNotification('下班後未滿30分鐘，不符合加班條件（請確認排班下班時間與打卡時間是否正確）', 'error');
         return;
     }
     
