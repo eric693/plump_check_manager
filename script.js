@@ -2212,6 +2212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             displayAdminAnnouncements();
             initAdminAnalysis();
             loadAllUsers();
+            checkTriggerStatus();
         } else if (tabId === 'overtime-view') {
             initOvertimeTab();
         } else if (tabId === 'leave-view') {
@@ -4346,6 +4347,58 @@ async function saveNewName(userId) {
     } catch (error) {
         console.error('更新姓名失敗:', error);
         showNotification('更新失敗，請稍後再試', 'error');
+    }
+}
+
+// ==================== ⏰ 特休觸發器設定 ====================
+
+async function checkTriggerStatus() {
+    const btn = document.getElementById('check-trigger-btn');
+    const area = document.getElementById('trigger-status-area');
+    if (btn) btn.textContent = '查詢中...';
+
+    try {
+        const res = await callApifetch('checkDailyTriggerStatus');
+        if (res.ok) {
+            if (res.active) {
+                area.className = 'mb-4 p-3 rounded-lg bg-green-50 dark:bg-green-900/30 text-sm text-green-700 dark:text-green-300';
+                area.innerHTML = `✅ <strong>已啟用</strong>｜${res.msg}`;
+                const setupBtn = document.getElementById('setup-trigger-btn');
+                if (setupBtn) setupBtn.textContent = '🔄 重新設定觸發器';
+            } else {
+                area.className = 'mb-4 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 text-sm text-yellow-700 dark:text-yellow-300';
+                area.innerHTML = `⚠️ <strong>尚未啟用</strong>｜${res.msg}`;
+            }
+        } else {
+            area.className = 'mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-sm text-red-700 dark:text-red-300';
+            area.innerHTML = `❌ 查詢失敗：${res.msg}`;
+        }
+    } catch (err) {
+        area.className = 'mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-sm text-red-700 dark:text-red-300';
+        area.innerHTML = '❌ 查詢失敗，請稍後再試';
+    } finally {
+        if (btn) btn.textContent = '🔍 檢查狀態';
+    }
+}
+
+async function setupAnnualLeaveTrigger() {
+    const btn = document.getElementById('setup-trigger-btn');
+    if (!confirm('確定要啟用「每日特休自動更新」嗎？\n\n系統將在每天凌晨 01:00 自動檢查員工週年日並累加特休假。')) return;
+
+    if (btn) { btn.disabled = true; btn.textContent = '設定中...'; }
+
+    try {
+        const res = await callApifetch('setupDailyTrigger');
+        if (res.ok) {
+            showNotification('✅ ' + res.msg, 'success');
+            await checkTriggerStatus();
+        } else {
+            showNotification('❌ ' + (res.msg || '設定失敗'), 'error');
+        }
+    } catch (err) {
+        showNotification('設定失敗，請稍後再試', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '✅ 啟用自動更新（每年週年日自動加特休）'; }
     }
 }
 

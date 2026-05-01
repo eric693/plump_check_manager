@@ -68,6 +68,10 @@ function doGet(e) {
         return respond1(handleDeleteUser(e.parameter));
       case "updateEmployeeHireDate":
         return respond1(handleUpdateEmployeeHireDate(e.parameter));
+      case "setupDailyTrigger":
+        return respond1(handleSetupDailyTrigger(e.parameter));
+      case "checkDailyTriggerStatus":
+        return respond1(handleCheckDailyTriggerStatus(e.parameter));
       
       case "updateEmployeeName":
         if (!validateSession(e.parameter.token)) {

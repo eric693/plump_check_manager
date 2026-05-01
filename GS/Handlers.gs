@@ -496,6 +496,38 @@ function handleUpdateEmployeeHireDate(params) {
   return updateEmployeeHireDate(token, userId, hireDate);
 }
 
+function handleSetupDailyTrigger(params) {
+  try {
+    const session = checkSession_(params.token);
+    if (!session.ok || !session.user) return { ok: false, msg: '未授權或 session 已過期' };
+    if (session.user.dept !== '管理員') return { ok: false, msg: '需要管理員權限' };
+    setupDailyTrigger();
+    return { ok: true, msg: '已成功啟用每日特休自動更新（每天凌晨 01:00 執行）' };
+  } catch (err) {
+    Logger.log('❌ handleSetupDailyTrigger 錯誤: ' + err.message);
+    return { ok: false, msg: '設定失敗：' + err.message };
+  }
+}
+
+function handleCheckDailyTriggerStatus(params) {
+  try {
+    const session = checkSession_(params.token);
+    if (!session.ok || !session.user) return { ok: false, msg: '未授權或 session 已過期' };
+    if (session.user.dept !== '管理員') return { ok: false, msg: '需要管理員權限' };
+
+    const triggers = ScriptApp.getProjectTriggers();
+    const found = triggers.find(t => t.getHandlerFunction() === 'updateAllEmployeesAnnualLeave');
+    if (found) {
+      return { ok: true, active: true, msg: '觸發器已啟用（每天凌晨 01:00 自動執行）' };
+    } else {
+      return { ok: true, active: false, msg: '尚未啟用，請點擊「啟用自動更新」按鈕' };
+    }
+  } catch (err) {
+    Logger.log('❌ handleCheckDailyTriggerStatus 錯誤: ' + err.message);
+    return { ok: false, msg: '查詢失敗：' + err.message };
+  }
+}
+
 // ==================== 審核功能相關 ====================
 
 function handleGetReviewRequest() {
