@@ -528,7 +528,24 @@ function initializeEmployeeLeave(sessionToken) {
       }
     }
     
-    const hireDate = new Date();
+    // 從員工名單讀取實際到職日，若未設定則預設今天
+    let hireDate = new Date();
+    try {
+      const empSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EMPLOYEES);
+      if (empSheet) {
+        const empValues = empSheet.getDataRange().getValues();
+        for (let j = 1; j < empValues.length; j++) {
+          if (empValues[j][EMPLOYEE_COL.USER_ID] === user.userId) {
+            const rawHire = empValues[j][EMPLOYEE_COL.HIRE_DATE];
+            if (rawHire) hireDate = new Date(rawHire);
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      Logger.log('⚠️ 讀取到職日失敗，使用今天: ' + e.message);
+    }
+
     const leaveInfo = getCurrentAnnualLeaveInfo(hireDate);
     const annualLeaveHours = leaveInfo.currentHours;
 
@@ -825,6 +842,29 @@ function reviewLeaveRequest(sessionToken, rowNumber, reviewAction, comment) {
       }
     } catch (salaryErr) {
       Logger.log(`⚠️ 薪資同步失敗（不影響請假審核結果）: ${salaryErr.message}`);
+    }
+
+    // 通知員工請假審核結果
+    try {
+      const endDateTime = record[6];
+      const isApproved = (reviewAction === 'approve');
+      const startDateStr = String(leaveStartDate).substring(0, 10);
+      const endDateStr = String(endDateTime).substring(0, 10);
+
+      notifyLeaveReview(
+        userId,
+        employeeName,
+        leaveType,
+        startDateStr,
+        endDateStr,
+        days,
+        employee.user.name,
+        isApproved,
+        comment || ''
+      );
+      Logger.log(`📤 已發送請假審核通知給 ${employeeName} (${userId})`);
+    } catch (notifyErr) {
+      Logger.log(`⚠️ 通知員工失敗（不影響審核結果）: ${notifyErr.message}`);
     }
 
     Logger.log('');
@@ -1408,4 +1448,135 @@ function updateAllEmployeesAnnualLeave() {
 
   Logger.log(`\n✅ 完成，共更新 ${updateCount} 筆`);
   return { ok: true, updateCount: updateCount };
+}
+
+// ==================== 到職日同步與觸發器 ====================
+
+/**
+ * 同步到職日到假期餘額並重算特休
+ * 由管理員介面呼叫：設定到職日 → 寫入員工名單 → 寫入假期餘額 → 重算特休
+ *
+ * @param {string} adminToken - 管理員 session token
+ * @param {string} targetUserId - 目標員工 LINE userId
+ * @param {string} hireDateStr - 到職日字串 (yyyy-MM-dd)
+ */
+function updateHireDateAndSyncLeave(adminToken, targetUserId, hireDateStr) {
+  try {
+    // 驗證管理員身份
+    const admin = checkSession_(adminToken);
+    if (!admin.ok || !admin.user) {
+      return { ok: false, code: 'ERR_SESSION_INVALID', msg: '未授權或 session 已過期' };
+    }
+    if (admin.user.dept !== '管理員') {
+      return { ok: false, code: 'ERR_PERMISSION_DENIED', msg: '需要管理員權限' };
+    }
+
+    const hireDate = new Date(hireDateStr);
+    if (isNaN(hireDate.getTime())) {
+      return { ok: false, msg: '無效的到職日格式，請使用 yyyy-MM-dd' };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // ① 更新員工名單 G 欄
+    const empSheet = ss.getSheetByName(SHEET_EMPLOYEES);
+    if (!empSheet) return { ok: false, msg: '找不到員工名單工作表' };
+
+    const empValues = empSheet.getDataRange().getValues();
+    let targetName = '';
+    let empRowFound = false;
+    for (let i = 1; i < empValues.length; i++) {
+      if (empValues[i][EMPLOYEE_COL.USER_ID] === targetUserId) {
+        empSheet.getRange(i + 1, EMPLOYEE_COL.HIRE_DATE + 1).setValue(hireDate);
+        targetName = empValues[i][EMPLOYEE_COL.NAME] || targetUserId;
+        empRowFound = true;
+        Logger.log(`✅ 員工名單到職日已更新: ${targetName} → ${hireDateStr}`);
+        break;
+      }
+    }
+    if (!empRowFound) return { ok: false, msg: '找不到該員工' };
+
+    // ② 計算應得特休時數
+    const leaveInfo = getCurrentAnnualLeaveInfo(hireDate);
+    const annualLeaveHours = leaveInfo.currentHours;
+
+    // ③ 更新或新增假期餘額
+    const balanceSheet = getLeaveBalanceSheet();
+    const balanceValues = balanceSheet.getDataRange().getValues();
+    let balanceRowFound = false;
+
+    for (let i = 1; i < balanceValues.length; i++) {
+      if (balanceValues[i][0] === targetUserId) {
+        // 已存在：更新到職日 (C) 和特休假 (D)
+        balanceSheet.getRange(i + 1, 3).setValue(hireDate);       // C: 到職日
+        balanceSheet.getRange(i + 1, 4).setValue(annualLeaveHours); // D: 特休假
+        balanceSheet.getRange(i + 1, 19).setValue(new Date());     // S: 更新時間
+        balanceRowFound = true;
+        Logger.log(`✅ 假期餘額到職日已同步: ${targetName}, 特休 ${annualLeaveHours} 小時`);
+        break;
+      }
+    }
+
+    if (!balanceRowFound) {
+      // 尚無假期餘額記錄，新增一筆
+      balanceSheet.appendRow([
+        targetUserId,      // A
+        targetName,        // B
+        hireDate,          // C: 到職日
+        annualLeaveHours,  // D: 特休假
+        240,               // E: 未住院病假
+        112,               // F: 事假
+        40,                // G: 喪假
+        64,                // H: 婚假
+        448,               // I: 產假
+        56,                // J: 陪產假
+        240,               // K: 住院病假
+        96,                // L: 生理假
+        56,                // M: 家庭照顧假
+        0,                 // N: 公假
+        0,                 // O: 公傷假
+        0,                 // P: 天然災害停班
+        0,                 // Q: 加班補休假
+        0,                 // R: 曠工
+        new Date()         // S: 更新時間
+      ]);
+      Logger.log(`✅ 假期餘額新增: ${targetName}, 特休 ${annualLeaveHours} 小時`);
+    }
+
+    return {
+      ok: true,
+      msg: `${targetName} 到職日已設定為 ${hireDateStr}，特休假更新為 ${annualLeaveHours} 小時（${annualLeaveHours / 8} 天）`,
+      data: {
+        employeeName: targetName,
+        hireDate: hireDateStr,
+        annualLeaveHours: annualLeaveHours,
+        annualLeaveDays: annualLeaveHours / 8
+      }
+    };
+
+  } catch (error) {
+    Logger.log('❌ updateHireDateAndSyncLeave 錯誤: ' + error.message);
+    return { ok: false, msg: '系統錯誤：' + error.message };
+  }
+}
+
+/**
+ * 建立每日自動更新特休的時間觸發器（在 GAS 後台手動執行一次即可）
+ */
+function setupDailyTrigger() {
+  // 先刪除舊的同名觸發器，避免重複
+  ScriptApp.getProjectTriggers().forEach(trigger => {
+    if (trigger.getHandlerFunction() === 'updateAllEmployeesAnnualLeave') {
+      ScriptApp.deleteTrigger(trigger);
+      Logger.log('🗑️ 已刪除舊觸發器');
+    }
+  });
+
+  ScriptApp.newTrigger('updateAllEmployeesAnnualLeave')
+    .timeBased()
+    .everyDays(1)
+    .atHour(1) // 每天凌晨 1 點執行
+    .create();
+
+  Logger.log('✅ 已建立每日觸發器：updateAllEmployeesAnnualLeave（每天凌晨 01:00）');
 }

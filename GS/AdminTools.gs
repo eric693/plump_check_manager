@@ -192,6 +192,72 @@ function resetAnnualLeave() {
   Logger.log(`✅ 成功重置 ${successCount} 位員工的年度假期`);
 }
 
+// ==================== 補定義缺少的輔助函式 ====================
+
+/**
+ * 根據到職日計算應得特休假天數（供 AdminTools 內部使用）
+ * @param {Date} hireDate - 到職日
+ * @returns {number} 特休假天數
+ */
+function calculateAnnualLeave_(hireDate) {
+  const hire = new Date(hireDate);
+  if (isNaN(hire.getTime())) return 0;
+  const yearsOfService = calculateYearsOfService(hire, new Date());
+  return calculateAnnualLeave(yearsOfService) / 8; // 轉回天數
+}
+
+/**
+ * 初始化或覆寫指定員工的假期餘額（供 AdminTools 內部使用）
+ * @param {string} userId - LINE User ID
+ * @param {Date} hireDate - 到職日
+ */
+function initializeLeaveBalance_(userId, hireDate) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const empSheet = ss.getSheetByName(SHEET_EMPLOYEES);
+  const balanceSheet = ss.getSheetByName(SHEET_LEAVE_BALANCE) || (() => {
+    const s = ss.insertSheet(SHEET_LEAVE_BALANCE);
+    s.appendRow(['員工ID','姓名','到職日','特休假','未住院病假','事假','喪假','婚假',
+                 '產假','陪產檢及陪產假','住院病假','生理假','家庭照顧假',
+                 '公假(含兵役假)','公傷假','天然災害停班','加班補休假','曠工','更新時間']);
+    return s;
+  })();
+
+  // 取得員工姓名
+  let employeeName = userId;
+  if (empSheet) {
+    const empValues = empSheet.getDataRange().getValues();
+    for (let i = 1; i < empValues.length; i++) {
+      if (empValues[i][EMPLOYEE_COL.USER_ID] === userId) {
+        employeeName = empValues[i][EMPLOYEE_COL.NAME] || userId;
+        break;
+      }
+    }
+  }
+
+  const hire = new Date(hireDate);
+  const leaveInfo = getCurrentAnnualLeaveInfo(hire);
+  const annualLeaveHours = leaveInfo.currentHours;
+
+  const balanceValues = balanceSheet.getDataRange().getValues();
+  for (let i = 1; i < balanceValues.length; i++) {
+    if (balanceValues[i][0] === userId) {
+      // 更新現有記錄
+      balanceSheet.getRange(i + 1, 3).setValue(hire);
+      balanceSheet.getRange(i + 1, 4).setValue(annualLeaveHours);
+      balanceSheet.getRange(i + 1, 19).setValue(new Date());
+      Logger.log(`✅ initializeLeaveBalance_: 更新 ${employeeName} 到職日 & 特休 ${annualLeaveHours} 小時`);
+      return;
+    }
+  }
+
+  // 新增記錄
+  balanceSheet.appendRow([
+    userId, employeeName, hire, annualLeaveHours,
+    240, 112, 40, 64, 448, 56, 240, 96, 56, 0, 0, 0, 0, 0, new Date()
+  ]);
+  Logger.log(`✅ initializeLeaveBalance_: 新增 ${employeeName} 特休 ${annualLeaveHours} 小時`);
+}
+
 /**
  * 在 Google Sheets 中新增自訂選單
  */

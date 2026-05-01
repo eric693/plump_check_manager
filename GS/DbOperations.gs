@@ -2188,6 +2188,14 @@ function testEmployeeBasicInfo() {
   
   const result2 = handleSetEmployeeBasicInfo(testParams);
   Logger.log('結果: ' + JSON.stringify(result2));
-  
+
   Logger.log('═══════════════════════════════════════');
+}
+
+/**
+ * 更新員工名單 G 欄的到職日並同步假期餘額
+ * （實際同步邏輯委派給 LeaveManagement.gs 的 updateHireDateAndSyncLeave）
+ */
+function updateEmployeeHireDate(adminToken, targetUserId, hireDateStr) {
+  return updateHireDateAndSyncLeave(adminToken, targetUserId, hireDateStr);
 }

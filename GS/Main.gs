@@ -66,6 +66,8 @@ function doGet(e) {
         return respond1(handleUpdateUserRole(e.parameter));
       case "deleteUser":
         return respond1(handleDeleteUser(e.parameter));
+      case "updateEmployeeHireDate":
+        return respond1(handleUpdateEmployeeHireDate(e.parameter));
       
       case "updateEmployeeName":
         if (!validateSession(e.parameter.token)) {

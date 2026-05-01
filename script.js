@@ -4028,17 +4028,24 @@ function renderUsersList(users) {
                       '<span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full whitespace-nowrap">員工</span>'}
                 </div>
                 
-                <p class="text-xs text-gray-600 dark:text-gray-400 mb-2 truncate">
+                <p class="text-xs text-gray-600 dark:text-gray-400 mb-1 truncate">
                     ${user.dept || '未設定部門'} ${user.rate ? `| ${user.rate}` : ''}
                 </p>
-                
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    到職日：<span class="font-medium text-gray-700 dark:text-gray-300">${user.hireDate ? (typeof user.hireDate === 'string' ? user.hireDate.substring(0, 10) : new Date(user.hireDate).toISOString().substring(0, 10)) : '未設定'}</span>
+                </p>
+
                 ${!isCurrentUser ? `
                     <div class="flex flex-wrap gap-2">
                         <button onclick="openEditNameDialog('${user.userId}', '${user.name}')"
                                 class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-md transition-colors">
                             ✏️ 編輯姓名
                         </button>
-                        
+                        <button onclick="openHireDateDialog('${user.userId}', '${user.name}', '${user.hireDate ? (typeof user.hireDate === 'string' ? user.hireDate.substring(0, 10) : new Date(user.hireDate).toISOString().substring(0, 10)) : ''}')"
+                                class="px-3 py-1.5 bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold rounded-md transition-colors">
+                            📅 設定到職日
+                        </button>
+
                         ${isAdmin ? `
                             <button onclick="changeUserRole('${user.userId}', '${user.name}', 'scheduler')"
                                     class="flex-1 min-w-[120px] px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-md transition-colors">
@@ -4067,7 +4074,7 @@ function renderUsersList(users) {
                                 升級為排班人員
                             </button>
                         `}
-                        
+
                         <button onclick="confirmDeleteUser('${user.userId}', '${user.name}')"
                                 class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-md transition-colors">
                             刪除
@@ -4338,6 +4345,116 @@ async function saveNewName(userId) {
         
     } catch (error) {
         console.error('更新姓名失敗:', error);
+        showNotification('更新失敗，請稍後再試', 'error');
+    }
+}
+
+// ==================== 📅 到職日設定 ====================
+
+/**
+ * 開啟設定到職日的對話框
+ */
+function openHireDateDialog(userId, userName, currentHireDate) {
+    const dialog = document.createElement('div');
+    dialog.id = 'hire-date-dialog';
+    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    dialog.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-1">
+                📅 設定到職日
+            </h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                員工：<span class="font-semibold text-gray-700 dark:text-gray-300">${userName}</span>
+            </p>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    到職日期 <span class="text-red-500">*</span>
+                </label>
+                <input type="date"
+                       id="hire-date-input"
+                       value="${currentHireDate || ''}"
+                       max="${new Date().toISOString().substring(0, 10)}"
+                       class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    ⚠️ 設定後將依勞基法自動計算特休假時數並同步至假期餘額
+                </p>
+            </div>
+
+            <div id="hire-date-preview" class="hidden mb-4 p-3 bg-teal-50 dark:bg-teal-900 rounded-lg text-sm text-teal-800 dark:text-teal-200"></div>
+
+            <div class="flex space-x-3">
+                <button onclick="closeHireDateDialog()"
+                        class="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg font-semibold transition-colors">
+                    取消
+                </button>
+                <button onclick="saveEmployeeHireDate('${userId}', '${userName}')"
+                        class="flex-1 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition-colors">
+                    確認儲存
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    // 日期選擇時即時預覽特休天數
+    const input = document.getElementById('hire-date-input');
+    const preview = document.getElementById('hire-date-preview');
+    input.addEventListener('change', () => {
+        const d = new Date(input.value);
+        if (isNaN(d.getTime())) { preview.classList.add('hidden'); return; }
+        const today = new Date();
+        const diffMs = today - d;
+        const months = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
+        let annualDays = 0;
+        if (months >= 6 && months < 12) annualDays = 3;
+        else if (months >= 12 && months < 24) annualDays = 7;
+        else if (months >= 24 && months < 36) annualDays = 10;
+        else if (months >= 36 && months < 60) annualDays = 14;
+        else if (months >= 60 && months < 120) annualDays = 15;
+        else if (months >= 120) annualDays = Math.min(15 + Math.floor(months / 12) - 9, 30);
+        preview.textContent = `預估特休假：${annualDays} 天（${annualDays * 8} 小時）`;
+        preview.classList.remove('hidden');
+    });
+    if (input.value) input.dispatchEvent(new Event('change'));
+
+    // 點擊背景關閉
+    dialog.addEventListener('click', e => { if (e.target === dialog) closeHireDateDialog(); });
+}
+
+function closeHireDateDialog() {
+    const dialog = document.getElementById('hire-date-dialog');
+    if (dialog) dialog.remove();
+}
+
+async function saveEmployeeHireDate(userId, userName) {
+    const input = document.getElementById('hire-date-input');
+    const hireDate = input ? input.value.trim() : '';
+
+    if (!hireDate) {
+        showNotification('請選擇到職日期', 'error');
+        return;
+    }
+
+    const token = localStorage.getItem('sessionToken');
+    if (!token) { showNotification('請先登入', 'error'); return; }
+
+    try {
+        showNotification('更新中...', 'info');
+        const res = await callApifetch(
+            `updateEmployeeHireDate&userId=${encodeURIComponent(userId)}&hireDate=${encodeURIComponent(hireDate)}`
+        );
+
+        if (res.ok) {
+            showNotification(`✅ ${res.msg}`, 'success');
+            closeHireDateDialog();
+            await loadAllUsers();
+        } else {
+            showNotification(res.msg || '更新失敗', 'error');
+        }
+    } catch (err) {
+        console.error('設定到職日失敗:', err);
         showNotification('更新失敗，請稍後再試', 'error');
     }
 }

@@ -488,6 +488,14 @@ function handleDeleteUser(params) {
 //   return getAllUsers();
 // }
 
+function handleUpdateEmployeeHireDate(params) {
+  const { token, userId, hireDate } = params;
+  if (!token || !userId || !hireDate) {
+    return { ok: false, msg: '缺少必要參數 (token / userId / hireDate)' };
+  }
+  return updateEmployeeHireDate(token, userId, hireDate);
+}
+
 // ==================== 審核功能相關 ====================
 
 function handleGetReviewRequest() {
