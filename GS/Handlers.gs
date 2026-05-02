@@ -2425,12 +2425,19 @@ function handleGetAnnouncements(params) {
     
     // 跳過標題列
     for (let i = 1; i < data.length; i++) {
+      // Google Sheets 可能把「5/11」這類值自動轉為 Date，需強制轉回字串
+      const safeStr = (v) => {
+        if (!v && v !== 0) return '';
+        if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Taipei', 'M/d');
+        return String(v);
+      };
+
       announcements.push({
-        id: data[i][0],
-        title: data[i][1],
-        content: data[i][2],
-        priority: data[i][3],
-        createdAt: data[i][4]
+        id:        String(data[i][0]),
+        title:     safeStr(data[i][1]),
+        content:   safeStr(data[i][2]),
+        priority:  safeStr(data[i][3]),
+        createdAt: data[i][4] instanceof Date ? data[i][4].toISOString() : String(data[i][4])
       });
     }
     
@@ -2468,8 +2475,12 @@ function handleAddAnnouncement(params) {
     const content = params.content;
     const priority = params.priority || 'normal';
     const createdAt = new Date().toISOString();
-    
-    sheet.appendRow([id, title, content, priority, createdAt]);
+
+    // 先設欄位格式為純文字，再寫入，避免 Google Sheets 將「5/11」等值自動轉為日期
+    const newRow = sheet.getLastRow() + 1;
+    const range = sheet.getRange(newRow, 1, 1, 5);
+    range.setNumberFormats([['@', '@', '@', '@', '@']]);
+    range.setValues([[id, title, content, priority, createdAt]]);
     
     return {
       ok: true,
