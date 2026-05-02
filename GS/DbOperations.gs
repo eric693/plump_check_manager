@@ -640,44 +640,50 @@ function getAttendanceDetails(monthParam, userIdParam) {
     Logger.log(`   打卡記錄: ${records.length} 筆`);
     Logger.log(`   請假記錄: ${leaveRecords.length} 筆`);
     Logger.log(`   加班記錄: ${overtimeRecords.length} 筆`);
-    
-    // ✅ 建立日期集合（過濾掉無效日期）
-    const allDates = new Set();
-    
-    // 加入打卡記錄的日期
+
+    // ✅ 建立「員工ID_日期」集合，避免多員工同日資料互相覆蓋
+    const allEntries = new Set();
+
+    // 加入打卡記錄
     records.forEach(r => {
       const dateKey = formatDate(r.date);
+      const uid = r.userId || 'unknown';
       if (dateKey) {
-        allDates.add(dateKey);
+        allEntries.add(uid + '_' + dateKey);
       }
     });
-    
-    // ✅ 加入請假記錄的日期（檢查日期格式）
+
+    // 加入請假記錄
     leaveRecords.forEach(r => {
       if (r.date && typeof r.date === 'string' && r.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        allDates.add(r.date);
+        const uid = r.employeeId || 'unknown';
+        allEntries.add(uid + '_' + r.date);
       } else {
         Logger.log(`⚠️ 請假記錄日期格式錯誤: ${r.date}`);
       }
     });
-    
-    // 加入加班記錄的日期
+
+    // 加入加班記錄
     overtimeRecords.forEach(r => {
       if (r.date && typeof r.date === 'string' && r.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        allDates.add(r.date);
+        const uid = r.employeeId || 'unknown';
+        allEntries.add(uid + '_' + r.date);
       }
     });
-    
-    Logger.log(`   涉及日期總數: ${allDates.size} 天`);
-    
-    // ✅ 按日期建立資料結構
+
+    Logger.log(`   涉及員工+日期總數: ${allEntries.size} 筆`);
+
+    // ✅ 按「員工ID_日期」建立資料結構
     const dailyRecords = {};
-    
-    // 初始化所有日期
-    allDates.forEach(dateKey => {
-      dailyRecords[dateKey] = {
+
+    allEntries.forEach(entryKey => {
+      // entryKey 格式：userId_YYYY-MM-DD，日期固定佔最後 10 個字元
+      const dateKey = entryKey.slice(-10);
+      const userId = entryKey.slice(0, -11);
+
+      dailyRecords[entryKey] = {
         date: dateKey,
-        userId: userIdParam,
+        userId: userId,
         name: '',
         record: [],
         reason: 'STATUS_NO_RECORD',
@@ -685,17 +691,19 @@ function getAttendanceDetails(monthParam, userIdParam) {
         leave: null
       };
     });
-    
+
     // 填入打卡記錄
     records.forEach(r => {
       const dateKey = formatDate(r.date);
-      
-      if (dailyRecords[dateKey]) {
-        if (!dailyRecords[dateKey].name) {
-          dailyRecords[dateKey].name = r.name;
+      const uid = r.userId || 'unknown';
+      const entryKey = uid + '_' + dateKey;
+
+      if (dailyRecords[entryKey]) {
+        if (!dailyRecords[entryKey].name) {
+          dailyRecords[entryKey].name = r.name;
         }
-        
-        dailyRecords[dateKey].record.push({
+
+        dailyRecords[entryKey].record.push({
           type: r.type,
           time: formatTime(r.date),
           location: r.location,
@@ -703,13 +711,14 @@ function getAttendanceDetails(monthParam, userIdParam) {
         });
       }
     });
-    
+
     // ✅ 填入請假資料
     leaveRecords.forEach(leave => {
-      const dateKey = leave.date;
-      
-      if (dailyRecords[dateKey]) {
-        dailyRecords[dateKey].leave = {
+      const uid = leave.employeeId || 'unknown';
+      const entryKey = uid + '_' + leave.date;
+
+      if (dailyRecords[entryKey]) {
+        dailyRecords[entryKey].leave = {
           leaveType: leave.leaveType,
           days: leave.days,
           status: leave.status,
@@ -717,39 +726,40 @@ function getAttendanceDetails(monthParam, userIdParam) {
           employeeName: leave.employeeName,
           reviewComment: leave.reviewComment || ''
         };
-        
+
         // 如果沒有員工姓名，從請假記錄取得
-        if (!dailyRecords[dateKey].name && leave.employeeName) {
-          dailyRecords[dateKey].name = leave.employeeName;
+        if (!dailyRecords[entryKey].name && leave.employeeName) {
+          dailyRecords[entryKey].name = leave.employeeName;
         }
-        
-        Logger.log(`   ${dateKey}: 加入請假資訊 (${leave.leaveType})`);
+
+        Logger.log(`   ${leave.date}: 加入請假資訊 (${leave.leaveType})`);
       }
     });
-    
+
     // 填入加班資料
     overtimeRecords.forEach(ot => {
-      const dateKey = ot.date;
-      
-      if (dailyRecords[dateKey]) {
-        dailyRecords[dateKey].overtime = {
+      const uid = ot.employeeId || 'unknown';
+      const entryKey = uid + '_' + ot.date;
+
+      if (dailyRecords[entryKey]) {
+        dailyRecords[entryKey].overtime = {
           startTime: ot.startTime,
           endTime: ot.endTime,
           hours: ot.hours,
           reason: ot.reason || ''
         };
-        
-        Logger.log(`   ${dateKey}: 加入加班資訊 (${ot.hours}h)`);
+
+        Logger.log(`   ${ot.date}: 加入加班資訊 (${ot.hours}h)`);
       }
     });
-    
+
     // 判斷每日狀態
-    Object.keys(dailyRecords).forEach(dateKey => {
-      const daily = dailyRecords[dateKey];
-      
+    Object.keys(dailyRecords).forEach(entryKey => {
+      const daily = dailyRecords[entryKey];
+
       const hasPunchIn = daily.record.some(r => r.type === '上班');
       const hasPunchOut = daily.record.some(r => r.type === '下班');
-      
+
       // ✅ 修正：如果有請假，根據打卡情況設定狀態
       if (daily.leave) {
         if (hasPunchIn && hasPunchOut) {
@@ -759,7 +769,7 @@ function getAttendanceDetails(monthParam, userIdParam) {
           // 只有請假沒打卡（全天假）
           daily.reason = 'STATUS_NO_RECORD';
         }
-        Logger.log(`   ${dateKey}: 有請假記錄，狀態設為 ${daily.reason}`);
+        Logger.log(`   ${daily.date}: 有請假記錄，狀態設為 ${daily.reason}`);
       } else {
         // 原有的打卡狀態判斷
         if (hasPunchIn && hasPunchOut) {
@@ -773,12 +783,14 @@ function getAttendanceDetails(monthParam, userIdParam) {
         }
       }
     });
-    
-    // ✅ 修正：轉換為陣列並排序（確保所有 date 都存在）
+
+    // ✅ 轉換為陣列並排序（先依員工ID，再依日期）
     const result = Object.values(dailyRecords)
-      .filter(r => r.date) // 過濾掉沒有 date 的記錄
+      .filter(r => r.date)
       .sort((a, b) => {
         if (!a.date || !b.date) return 0;
+        const userCompare = (a.userId || '').localeCompare(b.userId || '');
+        if (userCompare !== 0) return userCompare;
         return a.date.localeCompare(b.date);
       });
     
