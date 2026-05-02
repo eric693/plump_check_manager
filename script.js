@@ -1,6 +1,14 @@
 // 使用 CDN 或絕對路徑來載入 JSON 檔案
 // 注意：本檔案需要依賴 config.js，請確保它在腳本之前被載入。
 
+// 回傳本地日期字串 YYYY-MM-DD，避免 toISOString() 回傳 UTC 而在台灣時間跨日時出錯
+function localDateStr(d) {
+    return d.getFullYear() + '-' +
+           String(d.getMonth() + 1).padStart(2, '0') + '-' +
+           String(d.getDate()).padStart(2, '0');
+}
+function getTodayStr() { return localDateStr(new Date()); }
+
 let currentLang = localStorage.getItem("lang");
 let currentMonthDate = new Date();
 let translations = {};
@@ -610,7 +618,7 @@ function renderAbnormalRecords(records) {
             switch(record.reason) {
                 case 'STATUS_REPAIR_PENDING':
                     // 👇 修改這段
-                    const isToday = record.date === new Date().toISOString().split('T')[0];
+                    const isToday = record.date === getTodayStr();
                     const isTodayAdjust = record.punchTypes && record.punchTypes.includes('當日修正');
                     const isHistoryAdjust = record.punchTypes && record.punchTypes.includes('歷史補打');
                     
@@ -2838,8 +2846,8 @@ async function loadTodayShift() {
         infoEl.style.display = 'none';
         
         const userId = localStorage.getItem('sessionUserId');
-        const today = new Date().toISOString().split('T')[0];
-        
+        const today = getTodayStr();
+
         const res = await callApifetch(`getEmployeeShiftForDate&employeeId=${userId}&date=${today}`);
         
         loadingEl.style.display = 'none';
@@ -2889,11 +2897,11 @@ async function loadWeekShift() {
     const endOfWeek = new Date(today);
     endOfWeek.setDate(today.getDate() + 7);
     
-    const startDateStr = startOfWeek.toISOString().split('T')[0];
-    const endDateStr = endOfWeek.toISOString().split('T')[0];
-    
+    const startDateStr = localDateStr(startOfWeek);
+    const endDateStr = localDateStr(endOfWeek);
+
     console.log('📅 未來排班範圍:', {
-        today: today.toISOString().split('T')[0],
+        today: localDateStr(today),
         startOfWeek: startDateStr,
         endOfWeek: endDateStr
     });
@@ -4088,11 +4096,11 @@ async function doPunch(type) {
     if (type === '上班') {
         try {
             const userId = localStorage.getItem('sessionUserId');
-            const today = new Date().toISOString().split('T')[0];
+            const today = getTodayStr();
 
             const now = new Date();
             const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-            
+
             const shiftRes = await callApifetch(`getEmployeeShiftForDate&employeeId=${userId}&date=${today}`);
             
             if (shiftRes.ok && shiftRes.hasShift) {
@@ -5084,9 +5092,9 @@ function openAdjustTodayDialog() {
     dialog.id = 'adjust-today-dialog';
     
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = getTodayStr();
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
+
     dialog.innerHTML = `
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-4">
@@ -5209,7 +5217,7 @@ async function submitAdjustToday() {
         
         // 組合完整日期時間
         const now = new Date();
-        const today = now.toISOString().split('T')[0];
+        const today = getTodayStr();
         const datetime = `${today}T${time}:00`;
         
         const params = new URLSearchParams({
@@ -5253,9 +5261,8 @@ function openHistoryAdjustDialog() {
     dialog.id = 'history-adjust-dialog';
     
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-                        .toISOString().split('T')[0];
+    const today = getTodayStr();
+    const monthStart = localDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
     
     dialog.innerHTML = `
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
