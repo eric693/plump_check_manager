@@ -679,17 +679,42 @@
                             
                             <!-- 加班原因 -->
                             <div>
-                                <label data-i18n="OVERTIME_REASON_LABEL" 
-                                       for="overtime-reason" 
+                                <label data-i18n="OVERTIME_REASON_LABEL"
+                                       for="overtime-reason"
                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     加班原因
                                 </label>
-                                <textarea id="overtime-reason" 
-                                          rows="3" 
-                                          class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500" 
+                                <textarea id="overtime-reason"
+                                          rows="3"
+                                          class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500"
                                           placeholder="請說明加班原因..."></textarea>
                             </div>
-                            
+
+                            <!-- 補償方式 -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    補償方式
+                                </label>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <label class="flex items-center gap-3 p-3 border-2 border-indigo-400 dark:border-indigo-500 rounded-lg cursor-pointer bg-indigo-50 dark:bg-indigo-900/20 compensation-option">
+                                        <input type="radio" name="compensation-type" id="comp-type-pay" value="pay" checked
+                                               class="accent-indigo-600 w-4 h-4">
+                                        <div>
+                                            <p class="text-sm font-bold text-gray-800 dark:text-white">薪資加給</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400">計入當月薪資</p>
+                                        </div>
+                                    </label>
+                                    <label class="flex items-center gap-3 p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer compensation-option">
+                                        <input type="radio" name="compensation-type" id="comp-type-comp-leave" value="comp_leave"
+                                               class="accent-indigo-600 w-4 h-4">
+                                        <div>
+                                            <p class="text-sm font-bold text-gray-800 dark:text-white">補休</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400">增加補休假餘額</p>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
                             <!-- 提交按鈕 -->
                             <button id="submit-overtime-btn" 
                                     data-i18n="BTN_SUBMIT_OVERTIME"

@@ -167,18 +167,16 @@ function renderOvertimeRecords(requests, container) {
         const startTime = formatTimeDisplay(req.startTime);
         const endTime = formatTimeDisplay(req.endTime);
         
-        // 🔧 確保時數正確顯示
         const hours = parseFloat(req.hours) || 0;
-        const compHours = parseFloat(req.compensatoryHours) || 0;
-        // 狀態顯示
+        const compensationType = req.compensationType || 'pay';
+
         let statusBadge = '';
         let statusClass = '';
-        
-        // 🔧 統一處理狀態（轉為小寫比對）
+
         const status = String(req.status).toLowerCase().trim();
-        
-        console.log(`渲染加班記錄: 狀態=${status}, 時間=${startTime}-${endTime}, 時數=${hours}`);
-        
+
+        console.log(`渲染加班記錄: 狀態=${status}, 時間=${startTime}-${endTime}, 時數=${hours}, 補償=${compensationType}`);
+
         switch(status) {
             case 'pending':
                 statusBadge = t('OVERTIME_STATUS_PENDING') || '待審核';
@@ -196,7 +194,11 @@ function renderOvertimeRecords(requests, container) {
                 statusBadge = status;
                 statusClass = 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
         }
-        
+
+        const compBadge = compensationType === 'comp_leave'
+            ? `<span class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">補休</span>`
+            : `<span class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">薪資加給</span>`;
+
         li.innerHTML = `
             <div class="flex justify-between items-start mb-2">
                 <div>
@@ -205,11 +207,7 @@ function renderOvertimeRecords(requests, container) {
                         排班下班：${startTime} ｜ 打卡：${endTime}
                     </p>
                     <p class="text-sm text-gray-600 dark:text-gray-400">加班時數：${hours} 小時</p>
-                    ${compHours > 0 ? `
-                        <p class="text-sm text-orange-600 dark:text-orange-400 font-semibold mt-1">
-                            補休時數：${compHours} 小時
-                        </p>
-                    ` : ''}
+                    ${compBadge}
                 </div>
                 <span class="px-2 py-1 text-xs font-semibold rounded ${statusClass}">
                     ${statusBadge}
@@ -234,31 +232,29 @@ function renderOvertimeRecords(requests, container) {
  */
 function bindOvertimeFormEvents() {
     const submitBtn = document.getElementById('submit-overtime-btn');
-    
+
     if (submitBtn) {
-        // 移除舊的事件監聽器，避免重複綁定
         const newSubmitBtn = submitBtn.cloneNode(true);
         submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
         newSubmitBtn.addEventListener('click', handleOvertimeSubmit);
     }
-    
+
     // 自動計算加班時數
     const startTimeInput = document.getElementById('overtime-start-time');
     const endTimeInput = document.getElementById('overtime-end-time');
-    
+
     if (startTimeInput && endTimeInput) {
         const calculateHours = () => {
-            const start = startTimeInput.value; // 下班時間（排班結束）
-            const end = endTimeInput.value;     // 實際打卡時間
+            const start = startTimeInput.value;
+            const end = endTimeInput.value;
 
             if (start && end) {
                 const startTotalMin = parseInt(start.split(':')[0]) * 60 + parseInt(start.split(':')[1]);
                 const endTotalMin = parseInt(end.split(':')[0]) * 60 + parseInt(end.split(':')[1]);
 
                 let diffMin = endTotalMin - startTotalMin;
-                if (diffMin < 0) diffMin += 24 * 60; // 跨日計算
+                if (diffMin < 0) diffMin += 24 * 60;
 
-                // 規則：滿30分鐘計0.5小時，滿60分鐘計1小時，以此類推
                 let overtimeHours = 0;
                 if (diffMin >= 30) {
                     overtimeHours = Math.floor(diffMin / 30) * 0.5;
@@ -267,14 +263,33 @@ function bindOvertimeFormEvents() {
                 document.getElementById('overtime-hours').value = overtimeHours.toFixed(1);
             }
         };
-        
+
         startTimeInput.addEventListener('change', calculateHours);
         endTimeInput.addEventListener('change', calculateHours);
     }
+
+    // 補償方式 radio 選項高亮
+    document.querySelectorAll('input[name="compensation-type"]').forEach(radio => {
+        radio.addEventListener('change', updateCompensationOptionStyle);
+    });
+    updateCompensationOptionStyle();
+}
+
+function updateCompensationOptionStyle() {
+    document.querySelectorAll('.compensation-option').forEach(label => {
+        const radio = label.querySelector('input[type="radio"]');
+        if (radio && radio.checked) {
+            label.classList.add('border-indigo-400', 'dark:border-indigo-500', 'bg-indigo-50', 'dark:bg-indigo-900/20');
+            label.classList.remove('border-gray-200', 'dark:border-gray-600');
+        } else {
+            label.classList.remove('border-indigo-400', 'dark:border-indigo-500', 'bg-indigo-50', 'dark:bg-indigo-900/20');
+            label.classList.add('border-gray-200', 'dark:border-gray-600');
+        }
+    });
 }
 
 /**
- * 處理加班申請提交（修改版 - 加入補休時數檢查）
+ * 處理加班申請提交
  */
 async function handleOvertimeSubmit() {
     const dateInput = document.getElementById('overtime-date');
@@ -282,15 +297,17 @@ async function handleOvertimeSubmit() {
     const endTimeInput = document.getElementById('overtime-end-time');
     const hoursInput = document.getElementById('overtime-hours');
     const reasonInput = document.getElementById('overtime-reason');
-    const submitBtn = document.getElementById('submit-overtime-btn');
-    
+
     const overtimeDate = dateInput.value;
     const startTime = startTimeInput.value;
     const endTime = endTimeInput.value;
     const hours = parseFloat(hoursInput.value);
     const reason = reasonInput.value;
-    
-    // 驗證必填欄位
+
+    // 讀取補償方式
+    const compTypeRadio = document.querySelector('input[name="compensation-type"]:checked');
+    const compensationType = compTypeRadio ? compTypeRadio.value : 'pay';
+
     if (!overtimeDate || !startTime || !endTime || !reason) {
         showNotification(t('OVERTIME_FILL_ALL_FIELDS') || '請填寫所有欄位', 'error');
         return;
@@ -300,47 +317,39 @@ async function handleOvertimeSubmit() {
         showNotification('下班後未滿30分鐘，不符合加班條件（請確認排班下班時間與打卡時間是否正確）', 'error');
         return;
     }
-    
-    // ✅ 檢查是否超過本月上限
-    const checkResult = await checkMonthlyOvertimeLimit(overtimeDate, hours);
-    
-    if (!checkResult.withinLimit) {
-        // 超過上限，顯示補休時數欄位
-        showCompensatoryHoursInput(checkResult.currentHours, hours, checkResult.exceeded);
-        return;
-    }
-    
-    // 在上限內，正常提交
-    submitOvertimeRequest(overtimeDate, startTime, endTime, hours, reason, 0);
+
+    submitOvertimeRequest(overtimeDate, startTime, endTime, hours, reason, compensationType);
 }
 
 /**
- * ✨ 修改：提交加班申請（加入補休時數參數）
+ * 提交加班申請
  */
-async function submitOvertimeRequest(overtimeDate, startTime, endTime, hours, reason, compensatoryHours) {
+async function submitOvertimeRequest(overtimeDate, startTime, endTime, hours, reason, compensationType) {
     const submitBtn = document.getElementById('submit-overtime-btn');
     const loadingText = t('LOADING') || '處理中...';
-    
+
     generalButtonState(submitBtn, 'processing', loadingText);
-    
-    console.log(`提交加班申請: 日期=${overtimeDate}, 時數=${hours}, 補休=${compensatoryHours}`);
-    
+
+    console.log(`提交加班申請: 日期=${overtimeDate}, 時數=${hours}, 補償方式=${compensationType}`);
+
     try {
         const res = await callApifetch(
-            `submitOvertime&overtimeDate=${overtimeDate}&startTime=${startTime}&endTime=${endTime}&hours=${hours}&reason=${encodeURIComponent(reason)}&compensatoryHours=${compensatoryHours}`
+            `submitOvertime&overtimeDate=${overtimeDate}&startTime=${startTime}&endTime=${endTime}&hours=${hours}&reason=${encodeURIComponent(reason)}&compensationType=${compensationType}`
         );
-        
+
         if (res.ok) {
             showNotification(t('OVERTIME_SUBMIT_SUCCESS') || '加班申請提交成功', 'success');
 
-            // 清空表單
+            // 清空表單並重設補償方式為預設
             document.getElementById('overtime-date').value = '';
             document.getElementById('overtime-start-time').value = '';
             document.getElementById('overtime-end-time').value = '';
             document.getElementById('overtime-hours').value = '';
             document.getElementById('overtime-reason').value = '';
+            const payRadio = document.getElementById('comp-type-pay');
+            if (payRadio) payRadio.checked = true;
+            updateCompensationOptionStyle();
 
-            // 重新載入記錄
             await loadEmployeeOvertimeRecords();
         } else {
             showNotification(t(res.code) || res.msg || t('ERROR_SUBMIT_OVERTIME') || '提交失敗', 'error');
@@ -353,149 +362,6 @@ async function submitOvertimeRequest(overtimeDate, startTime, endTime, hours, re
     }
 }
 
-/**
- * ✨ 新增：檢查本月加班時數上限
- */
-async function checkMonthlyOvertimeLimit(overtimeDate, requestHours) {
-    try {
-        const res = await callApifetch('getEmployeeOvertime');
-        
-        if (!res.ok) {
-            return { withinLimit: true, currentHours: 0, exceeded: 0 };
-        }
-        
-        // 計算申請月份已核准的加班時數
-        const requestMonth = overtimeDate.substring(0, 7); // "YYYY-MM"
-        
-        const approvedThisMonth = res.requests.filter(req => {
-            const reqMonth = req.overtimeDate.substring(0, 7);
-            const status = String(req.status).toLowerCase().trim();
-            return reqMonth === requestMonth && status === 'approved';
-        });
-        
-        const currentHours = approvedThisMonth.reduce((sum, req) => {
-            return sum + (parseFloat(req.hours) || 0);
-        }, 0);
-        
-        const totalAfterRequest = currentHours + requestHours;
-        const exceeded = Math.max(0, totalAfterRequest - MAX_MONTHLY_OVERTIME);
-        
-        return {
-            withinLimit: totalAfterRequest <= MAX_MONTHLY_OVERTIME,
-            currentHours: currentHours,
-            totalAfterRequest: totalAfterRequest,
-            exceeded: exceeded
-        };
-        
-    } catch (error) {
-        console.error('檢查加班上限失敗:', error);
-        return { withinLimit: true, currentHours: 0, exceeded: 0 };
-    }
-}
-
-/**
- * ✨ 新增：顯示補休時數輸入欄位
- */
-function showCompensatoryHoursInput(currentHours, requestHours, exceededHours) {
-    const formHtml = `
-        <div id="compensatory-hours-form" class="mt-4 p-4 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-lg">
-            <h3 class="text-lg font-bold text-orange-800 dark:text-orange-300 mb-3">
-                ⚠️ 超過每月加班時數上限
-            </h3>
-            
-            <div class="space-y-2 mb-4 text-sm">
-                <p class="text-orange-700 dark:text-orange-400">
-                    <strong>本月已核准：</strong>${currentHours.toFixed(1)} 小時
-                </p>
-                <p class="text-orange-700 dark:text-orange-400">
-                    <strong>本次申請：</strong>${requestHours.toFixed(1)} 小時
-                </p>
-                <p class="text-orange-700 dark:text-orange-400">
-                    <strong>合計：</strong>${(currentHours + requestHours).toFixed(1)} 小時
-                </p>
-                <p class="text-red-700 dark:text-red-400 font-bold">
-                    <strong>超過上限：</strong>${exceededHours.toFixed(1)} 小時
-                </p>
-            </div>
-            
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 mb-4">
-                <label for="compensatory-hours" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    補休時數 <span class="text-red-500">*</span>
-                </label>
-                <input type="number" 
-                       id="compensatory-hours" 
-                       step="0.5" 
-                       min="0" 
-                       max="${exceededHours.toFixed(1)}"
-                       value="${exceededHours.toFixed(1)}"
-                       class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white">
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    超過上限的 ${exceededHours.toFixed(1)} 小時建議全數轉為補休
-                </p>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-3">
-                <button id="cancel-compensatory-btn" 
-                        class="py-2 px-4 rounded-lg font-bold bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200">
-                    取消
-                </button>
-                <button id="confirm-compensatory-btn" 
-                        class="py-2 px-4 rounded-lg font-bold btn-primary">
-                    確認提交
-                </button>
-            </div>
-        </div>
-    `;
-    
-    // 插入表單
-    const submitBtn = document.getElementById('submit-overtime-btn');
-    const parentDiv = submitBtn.parentElement;
-    
-    let formContainer = document.getElementById('compensatory-hours-form');
-    if (formContainer) {
-        formContainer.remove();
-    }
-    
-    parentDiv.insertAdjacentHTML('afterend', formHtml);
-    
-    // 綁定取消按鈕
-    document.getElementById('cancel-compensatory-btn').addEventListener('click', () => {
-        document.getElementById('compensatory-hours-form').remove();
-    });
-    
-    // 綁定確認按鈕
-    document.getElementById('confirm-compensatory-btn').addEventListener('click', () => {
-        const compensatoryHours = parseFloat(document.getElementById('compensatory-hours').value) || 0;
-        
-        if (compensatoryHours < 0) {
-            showNotification('補休時數不可為負數', 'error');
-            return;
-        }
-        
-        if (compensatoryHours > exceededHours) {
-            showNotification(`補休時數不可超過 ${exceededHours.toFixed(1)} 小時`, 'error');
-            return;
-        }
-        
-        // 提交加班申請（含補休時數）
-        const dateInput = document.getElementById('overtime-date');
-        const startTimeInput = document.getElementById('overtime-start-time');
-        const endTimeInput = document.getElementById('overtime-end-time');
-        const hoursInput = document.getElementById('overtime-hours');
-        const reasonInput = document.getElementById('overtime-reason');
-        
-        submitOvertimeRequest(
-            dateInput.value,
-            startTimeInput.value,
-            endTimeInput.value,
-            parseFloat(hoursInput.value),
-            reasonInput.value,
-            compensatoryHours
-        );
-        
-        document.getElementById('compensatory-hours-form').remove();
-    });
-}
 
 // ==================== 管理員審核功能 ====================
 
@@ -568,9 +434,14 @@ function renderPendingOvertimeRequests(requests, container) {
         const startTime = formatTimeDisplay(req.startTime);
         const endTime = formatTimeDisplay(req.endTime);
         const hours = parseFloat(req.hours) || 0;
-        
-        console.log(`渲染待審核: 行號=${req.rowNumber}, 時間=${startTime}-${endTime}, 時數=${hours}`);
-        
+        const compensationType = req.compensationType || 'pay';
+
+        console.log(`渲染待審核: 行號=${req.rowNumber}, 時間=${startTime}-${endTime}, 時數=${hours}, 補償=${compensationType}`);
+
+        const compBadge = compensationType === 'comp_leave'
+            ? `<span class="px-2 py-0.5 text-xs font-semibold rounded bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">補休</span>`
+            : `<span class="px-2 py-0.5 text-xs font-semibold rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">薪資加給</span>`;
+
         li.innerHTML = `
             <div class="space-y-2">
                 <div class="flex justify-between items-start">
@@ -585,6 +456,7 @@ function renderPendingOvertimeRequests(requests, container) {
                         <p class="text-sm text-indigo-600 dark:text-indigo-400">
                             <strong data-i18n="OVERTIME_HOURS_LABEL">加班時數：</strong>${hours} 小時
                         </p>
+                        <div class="mt-1">${compBadge}</div>
                     </div>
                 </div>
                 <p class="text-sm text-gray-600 dark:text-gray-400">

@@ -990,6 +990,67 @@ function deductLeaveBalance(userId, leaveType, hours) {
 }
 
 /**
+ * 增加假期餘額（用於補休核准後累加 COMP_TIME_OFF）
+ */
+function addLeaveBalance(userId, leaveType, hours) {
+  try {
+    Logger.log('📊 增加假期餘額');
+    Logger.log(`   員工ID: ${userId}`);
+    Logger.log(`   假別: ${leaveType}`);
+    Logger.log(`   小時數: ${hours}`);
+
+    const sheet = getLeaveBalanceSheet();
+    const values = sheet.getDataRange().getValues();
+
+    const leaveTypeColumnMap = {
+      'ANNUAL_LEAVE': 4,
+      'SICK_LEAVE': 5,
+      'PERSONAL_LEAVE': 6,
+      'BEREAVEMENT_LEAVE': 7,
+      'MARRIAGE_LEAVE': 8,
+      'MATERNITY_LEAVE': 9,
+      'PATERNITY_LEAVE': 10,
+      'HOSPITALIZATION_LEAVE': 11,
+      'MENSTRUAL_LEAVE': 12,
+      'FAMILY_CARE_LEAVE': 13,
+      'OFFICIAL_LEAVE': 14,
+      'WORK_INJURY_LEAVE': 15,
+      'NATURAL_DISASTER_LEAVE': 16,
+      'COMP_TIME_OFF': 17
+    };
+
+    const columnIndex = leaveTypeColumnMap[leaveType];
+    if (!columnIndex) {
+      Logger.log('❌ 無效的假別: ' + leaveType);
+      return { ok: false, msg: '無效的假別' };
+    }
+
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][0] === userId) {
+        Logger.log(`✅ 找到員工記錄（第 ${i + 1} 行）`);
+
+        const currentBalance = parseFloat(values[i][columnIndex - 1]) || 0;
+        const newBalance = currentBalance + hours;
+
+        Logger.log(`   目前餘額: ${currentBalance} → 新餘額: ${newBalance} 小時`);
+
+        sheet.getRange(i + 1, columnIndex).setValue(newBalance);
+        sheet.getRange(i + 1, 19).setValue(new Date());
+
+        return { ok: true, newBalance: newBalance };
+      }
+    }
+
+    Logger.log('❌ 找不到員工記錄');
+    return { ok: false, msg: '找不到員工記錄' };
+
+  } catch (error) {
+    Logger.log('❌ addLeaveBalance 錯誤: ' + error);
+    return { ok: false, msg: error.message };
+  }
+}
+
+/**
  * ✅ 取得已核准的請假記錄（使用無限制計算）
  */
 function getApprovedLeaveRecords(monthParam, userIdParam) {
