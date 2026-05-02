@@ -684,6 +684,7 @@ function getEmployeeMonthlyOvertime(employeeId, yearMonth) {
     const dateIndex = 3;        // 加班日期
     const hoursIndex = 6;       // 加班時數
     const statusIndex = 9;      // 審核狀態
+    const compTypeIndex = 15;   // 補償方式（col 16）
     
     Logger.log('🔍 使用欄位索引:');
     Logger.log('   員工ID: ' + userIdIndex);
@@ -731,7 +732,8 @@ function getEmployeeMonthlyOvertime(employeeId, yearMonth) {
       
       records.push({
         date: dateStr,
-        hours: hoursNum
+        hours: hoursNum,
+        compensationType: String(row[compTypeIndex] || 'pay').trim()
       });
       
       Logger.log(`   ✅ ${dateStr}: ${hoursNum}h (狀態: ${status})`);
@@ -1383,10 +1385,11 @@ function calculateHourlySalary(employeeId, yearMonth) {
     let holidayOvertimePay = 0;   // 國定假日加班費
     let holidayWorkPay = 0;       // 國定假日出勤薪資（正常工資）
     
-    // 按日期分組計算
+    // 按日期分組計算（補休的加班不計入薪資）
     const overtimeByDate = {};
 
     overtimeRecords.forEach(record => {
+      if ((record.compensationType || 'pay') === 'comp_leave') return;
       const date = record.date;
       if (!overtimeByDate[date]) {
         overtimeByDate[date] = 0;
@@ -2167,17 +2170,18 @@ function calculateMonthlySalaryInternal(employeeId, yearMonth) {
     let holidayOvertimePay = 0;   // 國定假日加班費
     let holidayWorkPay = 0;       // 國定假日出勤薪資（另計）
     
-    // 按日期分組計算
+    // 按日期分組計算（補休的加班不計入薪資）
     const overtimeByDate = {};
-    
+
     overtimeRecords.forEach(record => {
+      if ((record.compensationType || 'pay') === 'comp_leave') return;
       const date = record.date;
       if (!overtimeByDate[date]) {
         overtimeByDate[date] = 0;
       }
       overtimeByDate[date] += parseFloat(record.hours) || 0;
     });
-    
+
     Logger.log(`📊 每日加班統計: ${JSON.stringify(overtimeByDate)}`);
     const employeeType = String(config['員工類型'] || '正職').trim();
     const isFullTime = (employeeType === '正職');
