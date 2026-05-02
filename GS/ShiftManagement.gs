@@ -68,8 +68,8 @@ function getShiftTypes() {
       groupMap[group].items.push({
         rowIndex: i + 1,
         name: String(name),
-        startTime: String(startTime || ''),
-        endTime: String(endTime || ''),
+        startTime: formatTimeOnly(startTime),
+        endTime: formatTimeOnly(endTime),
         isLeave: isLeave,
         sortOrder: Number(sortOrder) || 99
       });
