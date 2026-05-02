@@ -389,7 +389,10 @@ function getLeaveBalance(sessionToken) {
     
     if (!sheet) {
       Logger.log('❌ 工作表不存在，嘗試建立...');
-      initializeEmployeeLeave(sessionToken);
+      const initResult = initializeEmployeeLeave(sessionToken);
+      if (!initResult.ok) {
+        return { ok: false, code: "ERR_INIT_FAILED", msg: '無法建立假期餘額工作表: ' + initResult.msg };
+      }
       return getLeaveBalance(sessionToken);
     }
     
@@ -437,7 +440,11 @@ function getLeaveBalance(sessionToken) {
     }
     
     Logger.log('⚠️ 找不到員工資料，嘗試初始化...');
-    initializeEmployeeLeave(sessionToken);
+    const initResult = initializeEmployeeLeave(sessionToken);
+    if (!initResult.ok) {
+      Logger.log('❌ 初始化失敗，停止遞迴: ' + initResult.msg);
+      return { ok: false, code: "ERR_INIT_FAILED", msg: '無法初始化假期餘額: ' + initResult.msg };
+    }
     return getLeaveBalance(sessionToken);
     
   } catch (error) {
@@ -572,7 +579,8 @@ function initializeEmployeeLeave(sessionToken) {
     ];
     
     sheet.appendRow(defaultBalance);
-    
+    SpreadsheetApp.flush(); // 確保寫入完成，讓後續遞迴讀取能讀到新資料
+
     Logger.log('✅ 已為員工 ' + user.name + ' 初始化假期餘額（小時制）');
     
     return {

@@ -497,6 +497,10 @@ async function loadLeaveBalance() {
             renderLeaveBalance(res.balance);
         } else {
             console.error('❌ 載入假期餘額失敗:', res);
+            const listEl = document.getElementById('leave-balance-list');
+            if (listEl) {
+                listEl.innerHTML = '<p class="text-sm text-red-500 py-2">載入假期餘額失敗，請重新整理頁面。</p>';
+            }
         }
     } catch (err) {
         console.error('❌ 載入假期餘額錯誤:', err);
