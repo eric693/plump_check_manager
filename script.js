@@ -4362,22 +4362,22 @@ async function checkTriggerStatus() {
         if (res.ok) {
             if (res.active) {
                 area.className = 'mb-4 p-3 rounded-lg bg-green-50 dark:bg-green-900/30 text-sm text-green-700 dark:text-green-300';
-                area.innerHTML = `✅ <strong>已啟用</strong>｜${res.msg}`;
+                area.innerHTML = `<strong>已啟用</strong>｜${res.msg}`;
                 const setupBtn = document.getElementById('setup-trigger-btn');
-                if (setupBtn) setupBtn.textContent = '🔄 重新設定觸發器';
+                if (setupBtn) setupBtn.textContent = '重新設定觸發器';
             } else {
                 area.className = 'mb-4 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 text-sm text-yellow-700 dark:text-yellow-300';
-                area.innerHTML = `⚠️ <strong>尚未啟用</strong>｜${res.msg}`;
+                area.innerHTML = `<strong>尚未啟用</strong>｜${res.msg}`;
             }
         } else {
             area.className = 'mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-sm text-red-700 dark:text-red-300';
-            area.innerHTML = `❌ 查詢失敗：${res.msg}`;
+            area.innerHTML = `查詢失敗：${res.msg}`;
         }
     } catch (err) {
         area.className = 'mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-sm text-red-700 dark:text-red-300';
-        area.innerHTML = '❌ 查詢失敗，請稍後再試';
+        area.innerHTML = '查詢失敗，請稍後再試';
     } finally {
-        if (btn) btn.textContent = '🔍 檢查狀態';
+        if (btn) btn.textContent = '檢查狀態';
     }
 }
 
@@ -4390,15 +4390,15 @@ async function setupAnnualLeaveTrigger() {
     try {
         const res = await callApifetch('setupDailyTrigger');
         if (res.ok) {
-            showNotification('✅ ' + res.msg, 'success');
+            showNotification(res.msg, 'success');
             await checkTriggerStatus();
         } else {
-            showNotification('❌ ' + (res.msg || '設定失敗'), 'error');
+            showNotification(res.msg || '設定失敗', 'error');
         }
     } catch (err) {
         showNotification('設定失敗，請稍後再試', 'error');
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = '✅ 啟用自動更新（每年週年日自動加特休）'; }
+        if (btn) { btn.disabled = false; btn.textContent = '啟用自動更新（每年週年日自動加特休）'; }
     }
 }
 
