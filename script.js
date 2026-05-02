@@ -1,14 +1,6 @@
 // 使用 CDN 或絕對路徑來載入 JSON 檔案
 // 注意：本檔案需要依賴 config.js，請確保它在腳本之前被載入。
 
-// 回傳本地日期字串 YYYY-MM-DD，避免 toISOString() 回傳 UTC 而在台灣時間跨日時出錯
-function localDateStr(d) {
-    return d.getFullYear() + '-' +
-           String(d.getMonth() + 1).padStart(2, '0') + '-' +
-           String(d.getDate()).padStart(2, '0');
-}
-function getTodayStr() { return localDateStr(new Date()); }
-
 let currentLang = localStorage.getItem("lang");
 let currentMonthDate = new Date();
 let translations = {};
@@ -3059,7 +3051,7 @@ function displayAnnouncements() {
         div.innerHTML = `
             <div class="flex items-start justify-between mb-2">
                 <h3 class="font-bold text-gray-800 dark:text-white">${icon} ${a.title}</h3>
-                <span class="text-xs text-gray-500">${new Date(a.createdAt).toLocaleDateString()}</span>
+                <span class="text-xs text-gray-500">${formatLocalDateTime(a.createdAt).substring(0, 10)}</span>
             </div>
             <p class="text-sm text-gray-600 dark:text-gray-300">${a.content}</p>
         `;
@@ -3082,7 +3074,7 @@ function displayAdminAnnouncements() {
                 <div class="flex-1">
                     <h3 class="font-bold text-gray-800 dark:text-white mb-1">${a.title}</h3>
                     <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">${a.content}</p>
-                    <span class="text-xs text-gray-500">${new Date(a.createdAt).toLocaleString()}</span>
+                    <span class="text-xs text-gray-500">${formatLocalDateTime(a.createdAt)}</span>
                 </div>
                 <button class="px-3 py-1 text-sm bg-red-500 hover:bg-red-600 text-white rounded ml-4" 
                         data-i18n="BTN_DELETE"
@@ -4838,7 +4830,7 @@ async function displayAnnouncements() {
         div.innerHTML = `
             <div class="flex items-start justify-between mb-2">
                 <h3 class="font-bold text-gray-800 dark:text-white">${icon} ${a.title}</h3>
-                <span class="text-xs text-gray-500">${new Date(a.createdAt).toLocaleDateString()}</span>
+                <span class="text-xs text-gray-500">${formatLocalDateTime(a.createdAt).substring(0, 10)}</span>
             </div>
             <p class="text-sm text-gray-600 dark:text-gray-300">${a.content}</p>
         `;
@@ -4869,7 +4861,7 @@ async function displayAdminAnnouncements() {
                 <div class="flex-1">
                     <h3 class="font-bold text-gray-800 dark:text-white mb-1">${a.title}</h3>
                     <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">${a.content}</p>
-                    <span class="text-xs text-gray-500">${new Date(a.createdAt).toLocaleString()}</span>
+                    <span class="text-xs text-gray-500">${formatLocalDateTime(a.createdAt)}</span>
                 </div>
                 <button class="px-3 py-1 text-sm bg-red-500 hover:bg-red-600 text-white rounded ml-4" 
                         data-i18n="BTN_DELETE"
@@ -4949,7 +4941,7 @@ async function initEmployeeBasicInfo() {
                 
                 if (updateTimeEl && updateTimeText) {
                     const date = new Date(res.data.updatedAt);
-                    updateTimeText.textContent = date.toLocaleString('zh-TW');
+                    updateTimeText.textContent = formatLocalDateTime(date);
                     updateTimeEl.style.display = 'block';
                 }
             }
@@ -5002,7 +4994,7 @@ async function initEmployeeBasicInfo() {
                 
                 if (updateTimeEl && updateTimeText) {
                     const date = new Date(res.data.updatedAt);
-                    updateTimeText.textContent = date.toLocaleString('zh-TW');
+                    updateTimeText.textContent = formatLocalDateTime(date);
                     updateTimeEl.style.display = 'block';
                 }
             }
@@ -5063,7 +5055,7 @@ async function saveEmployeeBasicInfo() {
             
             if (updateTimeEl && updateTimeText) {
                 const now = new Date();
-                updateTimeText.textContent = now.toLocaleString('zh-TW');
+                updateTimeText.textContent = formatLocalDateTime(now);
                 updateTimeEl.style.display = 'block';
             }
         } else {

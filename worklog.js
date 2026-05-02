@@ -18,7 +18,7 @@ function setupWorklogForm() {
     const submitBtn = document.getElementById('submit-worklog-btn');
     
     if (dateInput) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayStr();
         dateInput.value = today;
         dateInput.max = today;
     }
@@ -170,14 +170,7 @@ function renderWorklogRecords(worklogs) {
         if (log.submittedAt) {
             try {
                 const submittedDate = new Date(log.submittedAt);
-                submittedTimeStr = submittedDate.toLocaleString('zh-TW', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
-                });
+                submittedTimeStr = formatLocalDateTime(submittedDate);
             } catch (e) {
                 submittedTimeStr = log.submittedAt;
             }
@@ -478,14 +471,7 @@ function renderPendingWorklogs(worklogs) {
         if (log.submittedAt) {
             try {
                 const submittedDate = new Date(log.submittedAt);
-                submittedTimeStr = submittedDate.toLocaleString('zh-TW', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
-                });
+                submittedTimeStr = formatLocalDateTime(submittedDate);
             } catch (e) {
                 submittedTimeStr = log.submittedAt;
             }
@@ -699,7 +685,7 @@ async function generateWorklogExcel(employeeName, yearMonth, worklogs) {
             [headers.workContent]: log.content,
             [headers.status]: getStatusText(log.status),
             [headers.reviewComment]: log.reviewComment || '-',
-            [headers.submittedTime]: log.submittedAt ? new Date(log.submittedAt).toLocaleString('zh-TW') : '-'
+            [headers.submittedTime]: log.submittedAt ? formatLocalDateTime(log.submittedAt) : '-'
         }));
     } else {
         exportData = worklogs.map(log => ({
@@ -708,7 +694,7 @@ async function generateWorklogExcel(employeeName, yearMonth, worklogs) {
             [headers.workContent]: log.content,
             [headers.status]: getStatusText(log.status),
             [headers.reviewComment]: log.reviewComment || '-',
-            [headers.submittedTime]: log.submittedAt ? new Date(log.submittedAt).toLocaleString('zh-TW') : '-'
+            [headers.submittedTime]: log.submittedAt ? formatLocalDateTime(log.submittedAt) : '-'
         }));
     }
     

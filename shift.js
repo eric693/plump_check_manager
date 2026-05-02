@@ -100,20 +100,19 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     
     // 設定預設日期為今天
-    const today = new Date().toISOString().split('T')[0];
     const shiftDateEl = document.getElementById('shift-date');
-    if (shiftDateEl) shiftDateEl.value = today;
-    
+    if (shiftDateEl) shiftDateEl.value = getTodayStr();
+
     // 設定篩選日期為本週
     const startOfWeek = new Date();
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(endOfWeek.getDate() + 6);
-    
+
     const filterStartEl = document.getElementById('filter-start-date');
     const filterEndEl = document.getElementById('filter-end-date');
-    if (filterStartEl) filterStartEl.value = startOfWeek.toISOString().split('T')[0];
-    if (filterEndEl) filterEndEl.value = endOfWeek.toISOString().split('T')[0];
+    if (filterStartEl) filterStartEl.value = localDateStr(startOfWeek);
+    if (filterEndEl) filterEndEl.value = localDateStr(endOfWeek);
 });
 
 // ========== 分頁管理 ==========
@@ -1041,8 +1040,8 @@ function clearFilters() {
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     
-    document.getElementById('filter-start-date').value = startOfWeek.toISOString().split('T')[0];
-    document.getElementById('filter-end-date').value = endOfWeek.toISOString().split('T')[0];
+    document.getElementById('filter-start-date').value = localDateStr(startOfWeek);
+    document.getElementById('filter-end-date').value = localDateStr(endOfWeek);
     
     loadShifts();
 }
@@ -1054,7 +1053,7 @@ function exportShifts() {
     }
     
     const csv = convertToCSV(currentShifts);
-    const filename = `排班表_${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `排班表_${getTodayStr()}.csv`;
     downloadCSV(csv, filename);
     showMessage(t('SHIFT_EXPORT_SUCCESS'), 'success');
 }
@@ -1100,9 +1099,8 @@ function resetForm() {
         submitBtn.onclick = null;
     }
     
-    const today = new Date().toISOString().split('T')[0];
     const shiftDateEl = document.getElementById('shift-date');
-    if (shiftDateEl) shiftDateEl.value = today;
+    if (shiftDateEl) shiftDateEl.value = getTodayStr();
 }
 
 // ========== 批量上傳 ==========

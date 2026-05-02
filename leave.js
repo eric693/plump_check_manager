@@ -156,7 +156,7 @@ function calculateWorkHours(startTime, endTime) {
                 const overlapHours = overlapMs / (1000 * 60 * 60);
                 lunchHoursToDeduct += overlapHours;
                 
-                console.log(`   🍱 ${currentDate.toLocaleDateString()} 扣除午休: ${overlapHours.toFixed(2)} 小時`);
+                console.log(`   🍱 ${localDateStr(currentDate)} 扣除午休: ${overlapHours.toFixed(2)} 小時`);
             }
             
             // 移到下一天
@@ -280,7 +280,7 @@ function quickSelectTimeRange(type) {
     console.log('🎯 快速選擇:', type);
     
     const now = new Date();
-    const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const today = getTodayStr(); // YYYY-MM-DD
     
     let startTime, endTime;
     
