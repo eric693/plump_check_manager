@@ -848,8 +848,12 @@ function reviewLeaveRequest(sessionToken, rowNumber, reviewAction, comment) {
     try {
       const endDateTime = record[6];
       const isApproved = (reviewAction === 'approve');
-      const startDateStr = String(leaveStartDate).substring(0, 10);
-      const endDateStr = String(endDateTime).substring(0, 10);
+      const startDateStr = leaveStartDate instanceof Date
+        ? Utilities.formatDate(leaveStartDate, 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss')
+        : String(leaveStartDate).substring(0, 19);
+      const endDateStr = endDateTime instanceof Date
+        ? Utilities.formatDate(endDateTime, 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss')
+        : String(endDateTime).substring(0, 19);
 
       notifyLeaveReview(
         userId,
