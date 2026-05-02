@@ -5223,3 +5223,140 @@ async function submitHistoryAdjust() {
         generalButtonState(submitBtn, 'idle');
     }
 }
+// ==================== 班別管理 ====================
+
+async function loadShiftTypesForAdmin() {
+    const tableEl = document.getElementById('shift-type-admin-table');
+    if (!tableEl) return;
+    tableEl.innerHTML = '<p class="text-sm text-gray-400">載入中...</p>';
+
+    try {
+        const res = await callApifetch('getShiftTypes');
+        if (!res.ok || !res.groups) {
+            tableEl.innerHTML = '<p class="text-sm text-red-500">載入失敗：' + (res.msg || '未知錯誤') + '</p>';
+            return;
+        }
+
+        if (res.groups.length === 0) {
+            tableEl.innerHTML = '<p class="text-sm text-gray-400">尚無班別資料。</p>';
+            return;
+        }
+
+        let html = '<table class="w-full text-sm border-collapse"><thead><tr class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">'
+            + '<th class="p-2 text-left">分組</th><th class="p-2 text-left">班別名稱</th>'
+            + '<th class="p-2 text-left">開始</th><th class="p-2 text-left">結束</th>'
+            + '<th class="p-2 text-center">假別</th><th class="p-2 text-center">排序</th>'
+            + '<th class="p-2 text-center">操作</th></tr></thead><tbody>';
+
+        res.groups.forEach(g => {
+            g.items.forEach(item => {
+                const isLeaveStr = item.isLeave ? '是' : '-';
+                html += `<tr class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td class="p-2 text-gray-600 dark:text-gray-400">${g.group}</td>
+                    <td class="p-2 font-medium text-gray-800 dark:text-white">${item.name}</td>
+                    <td class="p-2">${item.startTime || '-'}</td>
+                    <td class="p-2">${item.endTime || '-'}</td>
+                    <td class="p-2 text-center">${isLeaveStr}</td>
+                    <td class="p-2 text-center">${item.sortOrder}</td>
+                    <td class="p-2 text-center space-x-2">
+                        <button onclick="openEditShiftTypeDialog(${item.rowIndex}, '${g.group}', '${item.name}', '${item.startTime}', '${item.endTime}', ${item.isLeave}, ${item.sortOrder})"
+                                class="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded">編輯</button>
+                        <button onclick="deleteShiftTypeAdmin(${item.rowIndex})"
+                                class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded">刪除</button>
+                    </td>
+                </tr>`;
+            });
+        });
+
+        html += '</tbody></table>';
+        tableEl.innerHTML = html;
+    } catch (err) {
+        tableEl.innerHTML = '<p class="text-sm text-red-500">載入失敗，請稍後再試</p>';
+    }
+}
+
+function openAddShiftTypeDialog() {
+    document.getElementById('shift-type-dialog-title').textContent = '新增班別';
+    document.getElementById('shift-type-row-index').value = '';
+    document.getElementById('shift-type-group').value = '';
+    document.getElementById('shift-type-name').value = '';
+    document.getElementById('shift-type-start').value = '';
+    document.getElementById('shift-type-end').value = '';
+    document.getElementById('shift-type-is-leave').checked = false;
+    document.getElementById('shift-type-sort').value = '99';
+    const dialog = document.getElementById('shift-type-dialog');
+    dialog.style.display = 'flex';
+}
+
+function openEditShiftTypeDialog(rowIndex, group, name, startTime, endTime, isLeave, sortOrder) {
+    document.getElementById('shift-type-dialog-title').textContent = '編輯班別';
+    document.getElementById('shift-type-row-index').value = rowIndex;
+    document.getElementById('shift-type-group').value = group;
+    document.getElementById('shift-type-name').value = name;
+    document.getElementById('shift-type-start').value = startTime;
+    document.getElementById('shift-type-end').value = endTime;
+    document.getElementById('shift-type-is-leave').checked = !!isLeave;
+    document.getElementById('shift-type-sort').value = sortOrder;
+    const dialog = document.getElementById('shift-type-dialog');
+    dialog.style.display = 'flex';
+}
+
+function closeShiftTypeDialog() {
+    document.getElementById('shift-type-dialog').style.display = 'none';
+}
+
+async function saveShiftTypeDialog() {
+    const rowIndex = document.getElementById('shift-type-row-index').value;
+    const group = document.getElementById('shift-type-group').value.trim();
+    const name = document.getElementById('shift-type-name').value.trim();
+    const startTime = document.getElementById('shift-type-start').value;
+    const endTime = document.getElementById('shift-type-end').value;
+    const isLeave = document.getElementById('shift-type-is-leave').checked;
+    const sortOrder = document.getElementById('shift-type-sort').value || '99';
+
+    if (!group || !name) {
+        showNotification('分組名稱和班別名稱為必填', 'error');
+        return;
+    }
+
+    const token = localStorage.getItem('sessionToken') || '';
+    const params = new URLSearchParams({ token, group, name, startTime, endTime, isLeave, sortOrder });
+
+    try {
+        let res;
+        if (rowIndex) {
+            params.append('rowIndex', rowIndex);
+            res = await callApifetch(`updateShiftType&${params.toString()}`);
+        } else {
+            res = await callApifetch(`addShiftType&${params.toString()}`);
+        }
+
+        if (res.ok) {
+            showNotification(res.msg || '儲存成功', 'success');
+            closeShiftTypeDialog();
+            await loadShiftTypesForAdmin();
+        } else {
+            showNotification(res.msg || '儲存失敗', 'error');
+        }
+    } catch (err) {
+        showNotification('儲存失敗，請稍後再試', 'error');
+    }
+}
+
+async function deleteShiftTypeAdmin(rowIndex) {
+    if (!confirm('確定要刪除此班別嗎？')) return;
+    const token = localStorage.getItem('sessionToken') || '';
+    const params = new URLSearchParams({ token, rowIndex });
+
+    try {
+        const res = await callApifetch(`deleteShiftType&${params.toString()}`);
+        if (res.ok) {
+            showNotification(res.msg || '已刪除', 'success');
+            await loadShiftTypesForAdmin();
+        } else {
+            showNotification(res.msg || '刪除失敗', 'error');
+        }
+    } catch (err) {
+        showNotification('刪除失敗，請稍後再試', 'error');
+    }
+}
