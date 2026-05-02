@@ -1130,17 +1130,40 @@ function handleLineLocation(event) {
     const lng = event.message.longitude;
     const replyToken = event.replyToken;
     
+    const locationTitle = (event.message.title || '').trim();
+
     Logger.log('📍 收到位置訊息');
     Logger.log('   userId: ' + userId);
     Logger.log('   座標: ' + lat + ', ' + lng);
-    
+    Logger.log('   title: ' + locationTitle);
+
+    // ✅ 防搜尋偽造：只允許「當前位置」，拒絕搜尋/釘選的地點
+    // 當使用者分享當前 GPS 位置時，LINE 的 title 為空字串或固定關鍵字；
+    // 若 title 是具體地點名稱，代表使用搜尋結果，應予拒絕。
+    const CURRENT_LOCATION_TITLES = ['', 'my location', '現在位置', '我的位置', 'location'];
+    const isCurrentLocation = CURRENT_LOCATION_TITLES.includes(locationTitle.toLowerCase());
+
+    if (!isCurrentLocation) {
+      Logger.log('❌ 拒絕搜尋地點打卡: title="' + locationTitle + '"');
+      replyMessage(replyToken,
+        '❌ 打卡失敗\n\n' +
+        '請傳送您的【當前位置（GPS）】，不可使用地圖搜尋結果打卡。\n\n' +
+        '操作方式：\n' +
+        '① 點選「+」\n' +
+        '② 選擇「位置資訊」\n' +
+        '③ 點選右下角「傳送」（不要搜尋）'
+      );
+      clearPunchIntent_(userId);
+      return;
+    }
+
     const employee = findEmployeeByLineUserId_(userId);
-    
+
     if (!employee.ok) {
       replyMessage(replyToken, '❌ 您尚未註冊為系統員工');
       return;
     }
-    
+
     // 🔧 修正：先嘗試從暫存取得打卡意圖
     let punchType = getPunchIntent_(userId);
     
