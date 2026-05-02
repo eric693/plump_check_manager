@@ -3167,13 +3167,19 @@ async function initAdminAnalysis() {
 async function loadEmployeeListForAnalysis() {
     try {
         const res = await callApifetch('getAllUsers');
-        
+
         if (res.ok && res.users) {
             const select = document.getElementById('analysis-employee');
             if (!select) return;
-            
+
             select.innerHTML = '<option value="">請選擇員工</option>';
-            
+
+            // 全部員工選項
+            const allOption = document.createElement('option');
+            allOption.value = 'ALL';
+            allOption.textContent = '全部員工';
+            select.appendChild(allOption);
+
             res.users.forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.userId;
@@ -3192,41 +3198,195 @@ async function loadEmployeeListForAnalysis() {
 async function loadPunchAnalysis() {
     const employeeId = document.getElementById('analysis-employee')?.value;
     const yearMonth = document.getElementById('analysis-month')?.value;
-    
+
     if (!employeeId) {
         showNotification('請選擇員工', 'error');
         return;
     }
-    
+
     if (!yearMonth) {
         showNotification('請選擇月份', 'error');
         return;
     }
-    
+
     const loadingEl = document.getElementById('punch-analysis-loading');
     const containerEl = document.getElementById('punch-analysis-container');
     const emptyEl = document.getElementById('punch-analysis-empty');
-    
+
     try {
         if (loadingEl) loadingEl.style.display = 'block';
         if (containerEl) containerEl.style.display = 'none';
         if (emptyEl) emptyEl.style.display = 'none';
-        
-        const res = await callApifetch(`getEmployeeMonthlyPunchData&employeeId=${employeeId}&yearMonth=${yearMonth}`);
-        
-        if (loadingEl) loadingEl.style.display = 'none';
-        
-        if (res.ok && res.data && res.data.length > 0) {
-            if (containerEl) containerEl.style.display = 'block';
-            renderCharts(res.data);
+
+        if (employeeId === 'ALL') {
+            // 全部員工：呼叫 getAttendanceDetails（不帶 userId）
+            const res = await callApifetch(`getAttendanceDetails&month=${yearMonth}`);
+
+            if (loadingEl) loadingEl.style.display = 'none';
+
+            if (res.ok && res.records && res.records.length > 0) {
+                if (containerEl) containerEl.style.display = 'block';
+                renderAllEmployeesCharts(res.records, yearMonth);
+            } else {
+                if (emptyEl) emptyEl.style.display = 'block';
+            }
         } else {
-            if (emptyEl) emptyEl.style.display = 'block';
+            // 單一員工
+            const res = await callApifetch(`getEmployeeMonthlyPunchData&employeeId=${employeeId}&yearMonth=${yearMonth}`);
+
+            if (loadingEl) loadingEl.style.display = 'none';
+
+            if (res.ok && res.data && res.data.length > 0) {
+                if (containerEl) containerEl.style.display = 'block';
+                renderCharts(res.data);
+                // 還原圖表標題
+                const workHoursTitle = document.querySelector('#punch-analysis-container h3:first-of-type');
+                const punchTimeTitle = document.querySelector('#punch-analysis-container h3:last-of-type');
+                if (workHoursTitle) workHoursTitle.textContent = '每日工作時數';
+                if (punchTimeTitle) punchTimeTitle.textContent = '打卡時間分布';
+            } else {
+                if (emptyEl) emptyEl.style.display = 'block';
+            }
         }
-        
+
     } catch (error) {
         console.error('載入分析失敗:', error);
         if (loadingEl) loadingEl.style.display = 'none';
         showNotification('載入失敗，請稍後再試', 'error');
+    }
+}
+
+/**
+ * 全部員工打卡分析圖表
+ */
+function renderAllEmployeesCharts(records, yearMonth) {
+    // 更新圖表標題
+    const chartTitles = document.querySelectorAll('#punch-analysis-container h3');
+    if (chartTitles[0]) chartTitles[0].textContent = '各員工當月總工時';
+    if (chartTitles[1]) chartTitles[1].textContent = '各員工平均打卡時間';
+
+    // 按員工分組
+    const employeeMap = {};
+
+    records.forEach(record => {
+        const uid = record.userId || 'unknown';
+        const name = record.name || uid;
+
+        if (!employeeMap[uid]) {
+            employeeMap[uid] = { name, totalHours: 0, punchInSum: 0, punchOutSum: 0, punchDays: 0 };
+        }
+
+        const punchIn  = record.record ? record.record.find(r => r.type === '上班') : null;
+        const punchOut = record.record ? record.record.find(r => r.type === '下班') : null;
+
+        if (punchIn && punchOut) {
+            try {
+                const inTime  = new Date(`${record.date} ${punchIn.time}`);
+                const outTime = new Date(`${record.date} ${punchOut.time}`);
+                const diffH   = (outTime - inTime) / (1000 * 60 * 60);
+                if (diffH > 0) {
+                    employeeMap[uid].totalHours += diffH;
+                    employeeMap[uid].punchInSum  += timeToDecimal(punchIn.time);
+                    employeeMap[uid].punchOutSum += timeToDecimal(punchOut.time);
+                    employeeMap[uid].punchDays   += 1;
+                }
+            } catch (e) { /* 忽略計算錯誤 */ }
+        }
+    });
+
+    const employees = Object.values(employeeMap).filter(e => e.name);
+    const names     = employees.map(e => e.name);
+    const totalHrs  = employees.map(e => parseFloat(e.totalHours.toFixed(2)));
+    const avgIn     = employees.map(e => e.punchDays > 0 ? parseFloat((e.punchInSum  / e.punchDays).toFixed(4)) : null);
+    const avgOut    = employees.map(e => e.punchDays > 0 ? parseFloat((e.punchOutSum / e.punchDays).toFixed(4)) : null);
+
+    // 各員工總工時（橫向 bar）
+    const workCanvas = document.getElementById('work-hours-chart');
+    if (workCanvas) {
+        if (workHoursChart) workHoursChart.destroy();
+        workHoursChart = new Chart(workCanvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: names,
+                datasets: [{
+                    label: '當月總工時',
+                    data: totalHrs,
+                    backgroundColor: 'rgba(79, 70, 229, 0.6)',
+                    borderColor: 'rgba(79, 70, 229, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                scales: {
+                    x: { beginAtZero: true, title: { display: true, text: '小時' } }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.parsed.x.toFixed(2)} 小時`
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // 各員工平均打卡時間（grouped bar）
+    const punchCanvas = document.getElementById('punch-time-chart');
+    if (punchCanvas) {
+        if (punchTimeChart) punchTimeChart.destroy();
+        punchTimeChart = new Chart(punchCanvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: names,
+                datasets: [
+                    {
+                        label: '平均上班打卡',
+                        data: avgIn,
+                        backgroundColor: 'rgba(34, 197, 94, 0.6)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: '平均下班打卡',
+                        data: avgOut,
+                        backgroundColor: 'rgba(239, 68, 68, 0.6)',
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        min: 6,
+                        max: 22,
+                        ticks: {
+                            stepSize: 1,
+                            callback: v => `${Math.floor(v)}:${String(Math.round((v % 1) * 60)).padStart(2, '0')}`
+                        },
+                        title: { display: true, text: '時間' }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                const v = ctx.parsed.y;
+                                if (v === null) return `${ctx.dataset.label}: 無資料`;
+                                const h = Math.floor(v);
+                                const m = Math.round((v % 1) * 60);
+                                return `${ctx.dataset.label}: ${h}:${String(m).padStart(2, '0')}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -3372,33 +3532,38 @@ async function exportEmployeePunchReport() {
     const employeeSelect = document.getElementById('analysis-employee');
     const monthInput = document.getElementById('analysis-month');
     const exportBtn = document.getElementById('export-employee-punch-btn');
-    
+
     if (!employeeSelect || !monthInput) return;
-    
+
     const employeeId = employeeSelect.value;
     const yearMonth = monthInput.value;
-    
+
     if (!employeeId) {
         showNotification('請選擇員工', 'error');
         return;
     }
-    
+
     if (!yearMonth) {
         showNotification('請選擇月份', 'error');
         return;
     }
-    
+
     const loadingText = t('EXPORT_LOADING') || '正在準備報表...';
     showNotification(loadingText, 'warning');
-    
+
     if (exportBtn) {
         generalButtonState(exportBtn, 'processing', loadingText);
     }
-    
+
     try {
+        if (employeeId === 'ALL') {
+            await exportAllEmployeesPunchReport(yearMonth, exportBtn);
+            return;
+        }
+
         // 取得員工名稱
         const employeeName = employeeSelect.options[employeeSelect.selectedIndex].text.split(' (')[0];
-        
+
         // 呼叫後端 API 取得詳細打卡資料
         const res = await callApifetch(`getAttendanceDetails&month=${yearMonth}&userId=${employeeId}`);
         
@@ -3550,6 +3715,110 @@ async function exportEmployeePunchReport() {
         if (exportBtn) {
             generalButtonState(exportBtn, 'idle');
         }
+    }
+}
+
+/**
+ * 匯出全部員工打卡報表（每人一個工作表，詳細格式）
+ */
+async function exportAllEmployeesPunchReport(yearMonth, exportBtn) {
+    try {
+        const res = await callApifetch(`getAttendanceDetails&month=${yearMonth}`);
+
+        if (!res.ok || !res.records || res.records.length === 0) {
+            showNotification(t('EXPORT_NO_DATA') || '本月沒有出勤記錄', 'warning');
+            return;
+        }
+
+        // 按員工分組
+        const employeeMap = {};
+        res.records.forEach(record => {
+            const uid  = record.userId || 'unknown';
+            const name = record.name   || uid;
+            if (!employeeMap[uid]) employeeMap[uid] = { name, records: [] };
+
+            const punchInRecord  = record.record ? record.record.find(r => r.type === '上班') : null;
+            const punchOutRecord = record.record ? record.record.find(r => r.type === '下班') : null;
+
+            let workHours = '-';
+            let workHoursDecimal = 0;
+
+            if (punchInRecord && punchOutRecord) {
+                try {
+                    const inTime  = new Date(`${record.date} ${punchInRecord.time}`);
+                    const outTime = new Date(`${record.date} ${punchOutRecord.time}`);
+                    const diffMs  = outTime - inTime;
+                    if (diffMs > 0) {
+                        const totalH   = diffMs / (1000 * 60 * 60);
+                        const lunchBreak = calculateLunchBreak(inTime, outTime, '月薪');
+                        const netH     = totalH - lunchBreak;
+                        workHoursDecimal = netH;
+                        const h = Math.floor(netH);
+                        const m = Math.round((netH - h) * 60);
+                        workHours = `${h}小時${m}分`;
+                    }
+                } catch (e) { workHours = '計算錯誤'; }
+            }
+
+            const notes = record.record
+                ? record.record.filter(r => r.note && r.note !== '系統虛擬卡').map(r => r.note).join('; ')
+                : '';
+
+            employeeMap[uid].records.push({
+                '日期': record.date,
+                '星期': getDayOfWeek(record.date),
+                '上班時間': punchInRecord  ? `${punchInRecord.time}:00`  : '-',
+                '上班地點': punchInRecord?.location  || '-',
+                '下班時間': punchOutRecord ? `${punchOutRecord.time}:00` : '-',
+                '下班地點': punchOutRecord?.location || '-',
+                '工作時數': workHours,
+                '工時（小時）': workHoursDecimal > 0 ? workHoursDecimal.toFixed(2) : '-',
+                '狀態': t(record.reason) || record.reason,
+                '備註': notes || '-'
+            });
+        });
+
+        const wb = XLSX.utils.book_new();
+        const wscols = [
+            { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 25 },
+            { wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 18 }, { wch: 30 }
+        ];
+
+        const [year, month] = yearMonth.split('-');
+
+        for (const uid in employeeMap) {
+            const emp = employeeMap[uid];
+            const data = [...emp.records];
+
+            // 統計行
+            const totalDays = data.filter(r => r['工時（小時）'] !== '-').length;
+            const totalH    = data.reduce((s, r) => s + (parseFloat(r['工時（小時）']) || 0), 0);
+            const avgH      = totalDays > 0 ? (totalH / totalDays).toFixed(2) : 0;
+
+            data.push({});
+            data.push({
+                '日期': '統計', '星期': '', '上班時間': '', '上班地點': '',
+                '下班時間': '', '下班地點': '',
+                '工作時數': `共 ${totalDays} 天`,
+                '工時（小時）': totalH.toFixed(2),
+                '狀態': `平均: ${avgH}`, '備註': ''
+            });
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            ws['!cols'] = wscols;
+            XLSX.utils.book_append_sheet(wb, ws, emp.name.substring(0, 31));
+        }
+
+        const fileName = `所有員工打卡記錄_${year}年${month}月.xlsx`;
+        XLSX.writeFile(wb, fileName);
+
+        showNotification(t('EXPORT_SUCCESS') || '報表已成功匯出！', 'success');
+
+    } catch (error) {
+        console.error('匯出失敗:', error);
+        showNotification(t('EXPORT_FAILED') || '匯出失敗，請稍後再試', 'error');
+    } finally {
+        if (exportBtn) generalButtonState(exportBtn, 'idle');
     }
 }
 
