@@ -405,10 +405,18 @@ function getLeaveBalance(sessionToken) {
       if (values[i][0] === user.userId) {
         Logger.log('✅ 找到員工資料');
         
+        // 如果 Google Sheets 把數字欄位格式化成日期，getValues() 會回傳 Date 物件，需轉回數字
+        const toHours = (v) => {
+          if (v instanceof Date) {
+            return Math.round((v - new Date(1899, 11, 30)) / 86400000);
+          }
+          return Number(v) || 0;
+        };
+
         const balance = {
           employeeName: values[i][1] || user.name,
           hireDate: values[i][2] || null,        // C: 到職日 ⭐
-          ANNUAL_LEAVE: values[i][3] || 0,       // D ⭐
+          ANNUAL_LEAVE: toHours(values[i][3]),   // D ⭐
           SICK_LEAVE: values[i][4] || 0,         // E ⭐
           PERSONAL_LEAVE: values[i][5] || 0,
           BEREAVEMENT_LEAVE: values[i][6] || 0,
@@ -579,6 +587,9 @@ function initializeEmployeeLeave(sessionToken) {
     ];
     
     sheet.appendRow(defaultBalance);
+    // 強制把 D~R 欄（假期小時數）設為純數字格式，避免 Google Sheets 因 C 欄日期而自動套用日期格式
+    const newRow = sheet.getLastRow();
+    sheet.getRange(newRow, 4, 1, 15).setNumberFormat("0");
     SpreadsheetApp.flush(); // 確保寫入完成，讓後續遞迴讀取能讀到新資料
 
     Logger.log('✅ 已為員工 ' + user.name + ' 初始化假期餘額（小時制）');
@@ -1613,6 +1624,9 @@ function updateHireDateAndSyncLeave(adminToken, targetUserId, hireDateStr) {
         0,                 // R: 曠工
         new Date()         // S: 更新時間
       ]);
+      // 強制把 D~R 欄（假期小時數）設為純數字格式
+      const newRow2 = balanceSheet.getLastRow();
+      balanceSheet.getRange(newRow2, 4, 1, 15).setNumberFormat("0");
       Logger.log(`✅ 假期餘額新增: ${targetName}, 特休 ${annualLeaveHours} 小時`);
     }
 
