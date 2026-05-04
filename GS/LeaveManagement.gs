@@ -845,7 +845,7 @@ function reviewLeaveRequest(sessionToken, rowNumber, reviewAction, comment) {
     try {
       let yearMonth = '';
       if (leaveStartDate instanceof Date) {
-        yearMonth = Utilities.formatDate(leaveStartDate, 'Asia/Taipei', 'yyyy-MM');
+        yearMonth = Utilities.formatDate(leaveStartDate, Session.getScriptTimeZone(), 'yyyy-MM');
       } else if (typeof leaveStartDate === 'string') {
         yearMonth = String(leaveStartDate).substring(0, 7);
       }
@@ -868,10 +868,10 @@ function reviewLeaveRequest(sessionToken, rowNumber, reviewAction, comment) {
       const endDateTime = record[6];
       const isApproved = (reviewAction === 'approve');
       const startDateStr = leaveStartDate instanceof Date
-        ? Utilities.formatDate(leaveStartDate, 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss')
+        ? Utilities.formatDate(leaveStartDate, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss')
         : String(leaveStartDate).substring(0, 19);
       const endDateStr = endDateTime instanceof Date
-        ? Utilities.formatDate(endDateTime, 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss')
+        ? Utilities.formatDate(endDateTime, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss')
         : String(endDateTime).substring(0, 19);
 
       notifyLeaveReview(

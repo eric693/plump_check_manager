@@ -419,7 +419,6 @@ async function loadWorkHoursCard(yearMonth, salaryData) {
     const totalWorkHours = parseFloat(salaryData['工作時數']) || 0;
     const hourlyRate = parseFloat(salaryData['時薪']) || 0;
     const baseSalary = parseFloat(salaryData['基本薪資']) || 0;
-    const totalWorkHoursInt = Math.floor(totalWorkHours);
     console.log(`⏱️ 總工時: ${totalWorkHours}h, 時薪: $${hourlyRate}, 基本薪資: $${baseSalary}`);
     
     // 建立工時卡片
@@ -445,7 +444,7 @@ async function loadWorkHoursCard(yearMonth, salaryData) {
             </div>
             <div class="text-center p-3 bg-purple-800/20 rounded-lg">
                 <p class="text-sm text-purple-300 mb-1">總工作時數</p>
-                <p class="text-2xl font-bold text-purple-200">${Math.floor(totalWorkHours)}h</p>
+                <p class="text-2xl font-bold text-purple-200">${totalWorkHours.toFixed(1)}h</p>
             </div>
             <div class="text-center p-3 bg-purple-800/20 rounded-lg">
                 <p class="text-sm text-purple-300 mb-1">基本薪資</p>
@@ -504,23 +503,22 @@ function displayEmployeeSalary(data) {
         const hourlyRate = parseFloat(data.hourlyRate) || 0;
         const totalWorkHours = parseFloat(data.totalWorkHours) || 0;
         
-        const baseSalaryLabel = document.querySelector('[for="detail-base-salary"]') || 
-                                document.querySelector('#detail-base-salary')?.previousElementSibling;
-        if (baseSalaryLabel) {
-            baseSalaryLabel.textContent = '基本薪資 (時薪×工時)';
-        }
-        
         safeSet('detail-base-salary', formatCurrency(data.baseSalary));
-        
+
         const baseSalaryEl = document.getElementById('detail-base-salary');
         if (baseSalaryEl && baseSalaryEl.parentElement) {
+            const baseSalaryLabel = baseSalaryEl.previousElementSibling;
+            if (baseSalaryLabel) {
+                baseSalaryLabel.removeAttribute('data-i18n');
+                baseSalaryLabel.textContent = '基本薪資 (時薪×工時)';
+            }
             let hourlyInfo = baseSalaryEl.parentElement.querySelector('.hourly-info');
             if (!hourlyInfo) {
                 hourlyInfo = document.createElement('div');
                 hourlyInfo.className = 'hourly-info text-xs text-purple-400 mt-1';
                 baseSalaryEl.parentElement.appendChild(hourlyInfo);
             }
-            hourlyInfo.textContent = `時薪 $${hourlyRate} × ${Math.floor(totalWorkHours)}h`;
+            hourlyInfo.textContent = `時薪 $${hourlyRate} × ${totalWorkHours.toFixed(1)}h`;
         }
     } else {
         safeSet('detail-base-salary', formatCurrency(data.baseSalary));
@@ -567,7 +565,7 @@ function displayEmployeeSalary(data) {
                 summaryHTML += `
                     <div class="flex justify-between text-sm mb-1">
                         <span class="text-blue-200">打卡工作時數：</span>
-                        <span class="font-mono text-blue-100">${Math.floor(totalWorkHours)}h</span>
+                        <span class="font-mono text-blue-100">${totalWorkHours.toFixed(1)}h</span>
                     </div>
                 `;
             }
