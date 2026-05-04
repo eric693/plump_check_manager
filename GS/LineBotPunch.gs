@@ -6125,20 +6125,20 @@ function sendLeaveBalance(replyToken, userId, employeeName) {
     for (let i = 1; i < values.length; i++) {
       if (values[i][0] === userId) {
         balance = {
-          annual: values[i][2] || 0,
-          sick: values[i][3] || 0,
-          personal: values[i][4] || 0,
-          bereavement: values[i][5] || 0,
-          marriage: values[i][6] || 0,
-          maternity: values[i][7] || 0,
-          paternity: values[i][8] || 0,
-          hospitalization: values[i][9] || 0,
-          menstrual: values[i][10] || 0,
-          familyCare: values[i][11] || 0,
-          official: values[i][12] || 0,
-          workInjury: values[i][13] || 0,
-          disaster: values[i][14] || 0,
-          compTimeOff: values[i][15] || 0
+          annual: values[i][3] || 0,
+          sick: values[i][4] || 0,
+          personal: values[i][5] || 0,
+          bereavement: values[i][6] || 0,
+          marriage: values[i][7] || 0,
+          maternity: values[i][8] || 0,
+          paternity: values[i][9] || 0,
+          hospitalization: values[i][10] || 0,
+          menstrual: values[i][11] || 0,
+          familyCare: values[i][12] || 0,
+          official: values[i][13] || 0,
+          workInjury: values[i][14] || 0,
+          disaster: values[i][15] || 0,
+          compTimeOff: values[i][16] || 0
         };
         break;
       }
