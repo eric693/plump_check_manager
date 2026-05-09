@@ -157,13 +157,15 @@ function submitLeaveRequest(sessionToken, leaveType, startDateTime, endDateTime,
     Logger.log('');
     
     Logger.log('💾 準備寫入資料...');
-    
+
+    const leaveTypeLabel = getLeaveTypeLabel(leaveType);
+
     const row = [
       new Date(),                  // A: 申請時間
       user.userId || '',           // B: 員工ID
       user.name || '',             // C: 姓名
       user.dept || '',             // D: 部門
-      leaveType || '',             // E: 假別
+      leaveTypeLabel || '',        // E: 假別（中文）
       formattedStartDateTime,      // F: 開始時間
       formattedEndDateTime,        // G: 結束時間
       workHours,                   // H: 工作時數
@@ -191,7 +193,7 @@ function submitLeaveRequest(sessionToken, leaveType, startDateTime, endDateTime,
     try {
       notifyAdminsNewLeaveRequest(
         user.name,
-        leaveType,
+        leaveTypeLabel,
         formattedStartDateTime,
         formattedEndDateTime,
         workHours,
@@ -925,6 +927,22 @@ function deductLeaveBalance(userId, leaveType, hours) {
     const values = sheet.getDataRange().getValues();
     
     const leaveTypeColumnMap = {
+      '特休假': 4,
+      '未住院病假': 5,
+      '事假': 6,
+      '喪假': 7,
+      '婚假': 8,
+      '產假': 9,
+      '陪產檢及陪產假': 10,
+      '住院病假': 11,
+      '生理假': 12,
+      '家庭照顧假': 13,
+      '公假（含兵役假）': 14,
+      '公傷假': 15,
+      '天然災害停班': 16,
+      '加班補休假': 17,
+      '曠工': 18,
+      // 相容舊英文代碼（存量資料用）
       'ANNUAL_LEAVE': 4,
       'SICK_LEAVE': 5,
       'PERSONAL_LEAVE': 6,
@@ -941,9 +959,9 @@ function deductLeaveBalance(userId, leaveType, hours) {
       'COMP_TIME_OFF': 17,
       'ABSENCE_WITHOUT_LEAVE': 18
     };
-    
+
     const columnIndex = leaveTypeColumnMap[leaveType];
-    
+
     if (!columnIndex) {
       Logger.log('❌ 無效的假別: ' + leaveType);
       return {
@@ -1014,6 +1032,21 @@ function addLeaveBalance(userId, leaveType, hours) {
     const values = sheet.getDataRange().getValues();
 
     const leaveTypeColumnMap = {
+      '特休假': 4,
+      '未住院病假': 5,
+      '事假': 6,
+      '喪假': 7,
+      '婚假': 8,
+      '產假': 9,
+      '陪產檢及陪產假': 10,
+      '住院病假': 11,
+      '生理假': 12,
+      '家庭照顧假': 13,
+      '公假（含兵役假）': 14,
+      '公傷假': 15,
+      '天然災害停班': 16,
+      '加班補休假': 17,
+      // 相容舊英文代碼（存量資料用）
       'ANNUAL_LEAVE': 4,
       'SICK_LEAVE': 5,
       'PERSONAL_LEAVE': 6,

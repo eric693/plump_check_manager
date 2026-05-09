@@ -252,6 +252,14 @@ function getLeaveTypeInfo(leaveTypeCode) {
 }
 
 /**
+ * 將假別代碼轉為中文標籤（找不到時回傳原始代碼）
+ */
+function getLeaveTypeLabel(leaveTypeCode) {
+  const info = LEAVE_TYPES[leaveTypeCode];
+  return info ? info.name : leaveTypeCode;
+}
+
+/**
  * 取得所有假期類型列表（按順序）
  */
 function getAllLeaveTypes() {
