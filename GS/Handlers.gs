@@ -616,6 +616,10 @@ function handleInitializeEmployeeLeave(params) {
   return initializeEmployeeLeave(params.token);
 }
 
+function handleGetAllEmployeesLeaveRecords(params) {
+  return getAllEmployeesLeaveRecordsAdmin(params.token, params.month);
+}
+
 // ==================== 排班功能相關 ====================
 
 function handleAddShift(params) {

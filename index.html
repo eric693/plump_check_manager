@@ -1245,8 +1245,35 @@
                         </div>
                     </div>
                     
+                    <!-- 下載員工請假紀錄 -->
                     <div class="card p-6 mt-6">
-                        <h2 data-i18n="ADD_LOCATION_TITLE" 
+                        <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-2">
+                            下載員工請假紀錄
+                        </h2>
+                        <p class="text-gray-500 dark:text-gray-400 mb-4">
+                            依月份匯出所有員工的請假紀錄（含待審核、已核准、已拒絕）
+                        </p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label for="admin-leave-export-month"
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    選擇月份
+                                </label>
+                                <input type="month"
+                                    id="admin-leave-export-month"
+                                    class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+
+                            <button id="admin-leave-export-btn"
+                                    class="w-full py-3 px-4 rounded-lg font-bold btn-primary">
+                                下載請假紀錄
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card p-6 mt-6">
+                        <h2 data-i18n="ADD_LOCATION_TITLE"
                             class="text-xl font-bold text-gray-800 dark:text-white mb-2">
                             新增打卡地點
                         </h2>

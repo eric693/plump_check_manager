@@ -271,6 +271,101 @@ async function exportAllEmployeesReport(monthKey) {
     }
 }
 
+// ==================== 管理員下載員工請假紀錄 ====================
+
+const LEAVE_TYPE_LABELS = {
+    ANNUAL_LEAVE: '特休',
+    COMP_TIME_OFF: '補休',
+    PERSONAL_LEAVE: '事假',
+    SICK_LEAVE: '病假',
+    HOSPITALIZATION_LEAVE: '住院假',
+    BEREAVEMENT_LEAVE: '喪假',
+    MARRIAGE_LEAVE: '婚假',
+    PATERNITY_LEAVE: '陪產假',
+    MATERNITY_LEAVE: '產假',
+    OFFICIAL_LEAVE: '公假',
+    WORK_INJURY_LEAVE: '工傷假',
+    ABSENCE_WITHOUT_LEAVE: '曠職',
+    NATURAL_DISASTER_LEAVE: '天災假',
+    FAMILY_CARE_LEAVE: '家庭照顧假',
+    MENSTRUAL_LEAVE: '生理假'
+};
+
+async function exportAllEmployeesLeaveReport(monthKey) {
+    const btn = document.getElementById('admin-leave-export-btn');
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '準備中...';
+    }
+
+    showNotification('正在取得請假紀錄...', 'warning');
+
+    try {
+        const res = await callApifetch(`getAllEmployeesLeaveRecords&month=${monthKey}`);
+
+        if (!res.ok) {
+            showNotification(res.msg || '取得資料失敗', 'error');
+            return;
+        }
+
+        if (!res.records || res.records.length === 0) {
+            showNotification('本月沒有請假紀錄', 'warning');
+            return;
+        }
+
+        const employeeMap = {};
+        res.records.forEach(r => {
+            const key = r.employeeId || r.employeeName;
+            if (!employeeMap[key]) {
+                employeeMap[key] = { name: r.employeeName, dept: r.dept, rows: [] };
+            }
+            employeeMap[key].rows.push({
+                '申請時間': r.applyTime || '',
+                '員工姓名': r.employeeName || '',
+                '部門': r.dept || '',
+                '假別': LEAVE_TYPE_LABELS[r.leaveType] || r.leaveType || '',
+                '開始時間': r.startDateTime || '',
+                '結束時間': r.endDateTime || '',
+                '請假時數': r.workHours || 0,
+                '請假天數': r.days || 0,
+                '請假原因': r.reason || '',
+                '狀態': r.statusLabel || r.status || '',
+                '審核人': r.reviewer || '',
+                '審核時間': r.reviewTime || '',
+                '審核備註': r.reviewComment || ''
+            });
+        });
+
+        const wb = XLSX.utils.book_new();
+
+        for (const key in employeeMap) {
+            const emp = employeeMap[key];
+            const ws = XLSX.utils.json_to_sheet(emp.rows);
+            ws['!cols'] = [
+                { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+                { wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 10 },
+                { wch: 20 }, { wch: 8 }, { wch: 10 }, { wch: 18 }, { wch: 20 }
+            ];
+            const sheetName = emp.name.substring(0, 31);
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        }
+
+        const [year, month] = monthKey.split('-');
+        XLSX.writeFile(wb, `員工請假紀錄_${year}年${month}月.xlsx`);
+        showNotification('請假紀錄已下載！', 'success');
+
+    } catch (error) {
+        console.error('下載請假紀錄失敗:', error);
+        showNotification('下載失敗，請稍後再試', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '下載請假紀錄';
+        }
+    }
+}
+
 // ==================== 📊 管理員匯出功能結束 ====================
 
 // ==================== 📊 匯出出勤報表功能 ====================
@@ -2737,6 +2832,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             exportAllEmployeesReport(selectedMonth);
         });
     }
+    const adminLeaveExportBtn = document.getElementById('admin-leave-export-btn');
+    const adminLeaveExportMonthInput = document.getElementById('admin-leave-export-month');
+
+    if (adminLeaveExportBtn && adminLeaveExportMonthInput) {
+        const now = new Date();
+        const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        adminLeaveExportMonthInput.value = defaultMonth;
+
+        adminLeaveExportBtn.addEventListener('click', () => {
+            const selectedMonth = adminLeaveExportMonthInput.value;
+            if (!selectedMonth) {
+                showNotification('請選擇要下載的月份', 'error');
+                return;
+            }
+            exportAllEmployeesLeaveReport(selectedMonth);
+        });
+    }
+
     // 語系切換事件
     document.getElementById('language-switcher').addEventListener('change', (e) => {
         const newLang = e.target.value;

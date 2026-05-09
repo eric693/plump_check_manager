@@ -1218,6 +1218,88 @@ function getApprovedLeaveRecords(monthParam, userIdParam) {
 }
 
 /**
+ * 管理員取得所有員工的請假紀錄（依月份篩選）
+ */
+function getAllEmployeesLeaveRecordsAdmin(sessionToken, month) {
+  try {
+    const employee = checkSession_(sessionToken);
+
+    if (!employee.ok || !employee.user) {
+      return { ok: false, code: 'ERR_SESSION_INVALID' };
+    }
+
+    if (employee.user.dept !== '管理員') {
+      return { ok: false, code: 'ERR_PERMISSION_DENIED', msg: '需要管理員權限' };
+    }
+
+    const sheet = getLeaveRecordsSheet();
+    const values = sheet.getDataRange().getValues();
+
+    if (values.length <= 1) {
+      return { ok: true, records: [] };
+    }
+
+    const records = [];
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const startDateTime = row[5];
+
+      if (!startDateTime) continue;
+
+      let startDate;
+      try {
+        startDate = new Date(startDateTime);
+        if (isNaN(startDate.getTime())) continue;
+      } catch (e) {
+        continue;
+      }
+
+      const rowYear = startDate.getFullYear();
+      const rowMonth = String(startDate.getMonth() + 1).padStart(2, '0');
+      const rowMonthKey = `${rowYear}-${rowMonth}`;
+
+      if (rowMonthKey !== month) continue;
+
+      const statusRaw = String(row[10] || '').trim();
+      let statusLabel = '待審核';
+      if (statusRaw === 'APPROVED') statusLabel = '已核准';
+      else if (statusRaw === 'REJECTED') statusLabel = '已拒絕';
+
+      records.push({
+        applyTime: formatDateTime(row[0]),
+        employeeId: row[1],
+        employeeName: row[2],
+        dept: row[3],
+        leaveType: row[4],
+        startDateTime: formatDateTime(startDateTime),
+        endDateTime: formatDateTime(row[6]),
+        workHours: row[7] || 0,
+        days: row[8] || 0,
+        reason: row[9] || '',
+        status: statusRaw,
+        statusLabel: statusLabel,
+        reviewer: row[11] || '',
+        reviewTime: row[12] ? formatDateTime(row[12]) : '',
+        reviewComment: row[13] || ''
+      });
+    }
+
+    records.sort((a, b) => {
+      const nameCompare = String(a.employeeName).localeCompare(String(b.employeeName), 'zh-TW');
+      if (nameCompare !== 0) return nameCompare;
+      return new Date(a.startDateTime) - new Date(b.startDateTime);
+    });
+
+    return { ok: true, records: records };
+
+  } catch (error) {
+    Logger.log('getAllEmployeesLeaveRecordsAdmin 錯誤: ' + error.message);
+    return { ok: false, msg: error.message };
+  }
+}
+
+/**
  * ✅ 格式化日期時間
  */
 function formatDateTime(date) {

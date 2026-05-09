@@ -118,6 +118,8 @@ function doGet(e) {
         return respond1(handleReviewLeave(e.parameter));
       case "initializeEmployeeLeave":
         return respond1(handleInitializeEmployeeLeave(e.parameter));
+      case "getAllEmployeesLeaveRecords":
+        return respond1(handleGetAllEmployeesLeaveRecords(e.parameter));
       
       // ==================== 工作日誌系統（⭐ 新增在這裡）====================
       case "submitWorklog":
