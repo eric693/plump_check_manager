@@ -227,9 +227,6 @@ function updateWorkHoursPreview() {
     if (workHours <= 0) {
         hasError = true;
         errorMsg = '❌ 結束時間必須晚於開始時間';
-    } else if (!Number.isInteger(workHours)) {
-        hasError = true;
-        errorMsg = `❌ 請假時數必須是整數小時（目前為 ${workHours} 小時）\n請調整時間使其為整數小時`;
     }
     
     // 顯示警告訊息
@@ -443,19 +440,8 @@ function validateLeaveForm() {
         return false;
     }
     
-    // 檢查是否為整點時間
     const start = new Date(startTime);
     const end = new Date(endTime);
-    
-    if (start.getMinutes() !== 0 || start.getSeconds() !== 0) {
-        showNotification('開始時間必須是整點（例如：09:00, 10:00）', 'error');
-        return false;
-    }
-    
-    if (end.getMinutes() !== 0 || end.getSeconds() !== 0) {
-        showNotification('結束時間必須是整點（例如：09:00, 10:00）', 'error');
-        return false;
-    }
     
     if (!reason.trim() || reason.trim().length < 2) {
         showNotification('請填寫請假原因（至少2個字）', 'error');
@@ -469,10 +455,6 @@ function validateLeaveForm() {
         return false;
     }
     
-    if (!Number.isInteger(workHours)) {
-        showNotification(`請假時數必須是整數小時，目前為 ${workHours} 小時`, 'error');
-        return false;
-    }
     
     return true;
 }

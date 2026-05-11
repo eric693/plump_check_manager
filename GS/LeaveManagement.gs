@@ -72,32 +72,7 @@ function submitLeaveRequest(sessionToken, leaveType, startDateTime, endDateTime,
       };
     }
 
-    Logger.log('🔍 檢查是否為整點時間...');
-
-    const startMinutes = start.getMinutes();
-    const startSeconds = start.getSeconds();
-    const endMinutes = end.getMinutes();
-    const endSeconds = end.getSeconds();
-
-    if (startMinutes !== 0 || startSeconds !== 0) {
-      Logger.log(`❌ 開始時間不是整點: ${start.toISOString()}`);
-      return {
-        ok: false,
-        code: "ERR_INVALID_TIME_FORMAT",
-        msg: "開始時間必須是整點（例如：09:00, 10:00）"
-      };
-    }
-
-    if (endMinutes !== 0 || endSeconds !== 0) {
-      Logger.log(`❌ 結束時間不是整點: ${end.toISOString()}`);
-      return {
-        ok: false,
-        code: "ERR_INVALID_TIME_FORMAT",
-        msg: "結束時間必須是整點（例如：09:00, 10:00）"
-      };
-    }
-
-    Logger.log('✅ 時間格式檢查通過（整點）');
+    Logger.log('✅ 時間格式檢查通過');
     Logger.log('');
 
     Logger.log('💡 計算工作時數和天數（無時段限制）...');
