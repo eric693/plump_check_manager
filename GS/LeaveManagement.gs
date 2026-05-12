@@ -232,7 +232,7 @@ function calculateWorkHoursAndDays_Unlimited(start, end) {
     Logger.log(`   結束: ${end.toISOString()}`);
     
     // ⭐ 配置選項
-    const DEDUCT_LUNCH = true;   // 是否扣除午休時間（true = 扣除，false = 不扣除）
+    const DEDUCT_LUNCH = false;  // 是否扣除午休時間（true = 扣除，false = 不扣除）
     const LUNCH_START = 12;      // 午休開始（小時）
     const LUNCH_END = 13;        // 午休結束（小時）
     

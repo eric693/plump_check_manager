@@ -1920,11 +1920,9 @@ function getEmployeeMonthlyAttendanceInternal(employeeId, yearMonth, salaryType)
           
           if (diffMs > 0) {
             const totalHours = diffMs / (1000 * 60 * 60);
-            // 月薪扣1小時午休，時薪扣0.5小時午休
-            const lunchBreak = (salaryType === '時薪') ? 0.5 : 1;
-            // 四捨五入到0.5小時精度（時薪員工按實際工時計算）
-            workHours = Math.round(Math.max(0, totalHours - lunchBreak) * 2) / 2;
-            Logger.log(`   ${date}: ${punchIn} ~ ${punchOut} = ${workHours.toFixed(2)}h (原始: ${totalHours.toFixed(2)}h, 午休: ${lunchBreak}h)`);
+            // 午休不扣除，直接計算實際工時
+            workHours = Math.round(Math.max(0, totalHours) * 2) / 2;
+            Logger.log(`   ${date}: ${punchIn} ~ ${punchOut} = ${workHours.toFixed(2)}h (原始: ${totalHours.toFixed(2)}h)`);
           } else {
             Logger.log(`   ⚠️ ${date}: ${punchIn} ~ ${punchOut} 時間異常（下班早於上班）`);
           }

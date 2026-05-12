@@ -1140,39 +1140,8 @@ async function updateMonthlyStats(records) {
     }
 }
 
-/**
- * ⭐ 修改：根據薪資類型決定午休時間
- */
 function calculateLunchBreak(inTime, outTime, salaryType) {
-    const lunchStart = new Date(inTime);
-    lunchStart.setHours(12, 0, 0, 0);
-    
-    const lunchEnd = new Date(inTime);
-    
-    // ⭐⭐⭐ 關鍵修改：月薪扣 1 小時，時薪扣 0.5 小時
-    if (salaryType === '月薪') {
-        lunchEnd.setHours(13, 0, 0, 0); // 12:00-13:00 = 1 小時
-    } else {
-        lunchEnd.setHours(12, 30, 0, 0); // 12:00-12:30 = 0.5 小時
-    }
-    
-    // 如果工作時段完全不涵蓋午休時間，不扣除
-    if (outTime <= lunchStart || inTime >= lunchEnd) {
-        return 0;
-    }
-    
-    // 如果涵蓋完整午休時間
-    if (inTime < lunchStart && outTime > lunchEnd) {
-        return salaryType === '月薪' ? 1 : 0.5;
-    }
-    
-    // 部分涵蓋午休時間
-    const overlapStart = inTime > lunchStart ? inTime : lunchStart;
-    const overlapEnd = outTime < lunchEnd ? outTime : lunchEnd;
-    const overlapMs = overlapEnd - overlapStart;
-    const overlapHours = overlapMs / (1000 * 60 * 60);
-    
-    return Math.max(0, overlapHours);
+    return 0; // 午休不扣除
 }
 
 /**

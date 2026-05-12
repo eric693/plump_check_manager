@@ -117,7 +117,7 @@ function calculateWorkHours(startTime, endTime) {
     // ⭐ 午休時間設定（可選是否扣除）
     const LUNCH_START = 12;         // 午休開始 12:00
     const LUNCH_END = 13;           // 午休結束 13:00
-    const DEDUCT_LUNCH = true;      // ⭐ 設為 false 可以不扣除午休
+    const DEDUCT_LUNCH = false;     // 午休不扣除
     
     // 計算總毫秒數
     const totalMs = end - start;
