@@ -14,7 +14,7 @@ function handleLineMessage(event) {
     const employee = findEmployeeByLineUserId_(userId);
     
     if (!employee.ok) {
-      replyMessage(replyToken, '❌ 您尚未註冊為系統員工\n\n請先到網頁版登入以完成註冊\n🔗 https://eric693.github.io/haiya_check_manager/');
+      replyMessage(replyToken, '❌ 您尚未註冊為系統員工\n\n請先到網頁版登入以完成註冊\n🔗 https://eric693.github.io/plump_check_manager/');
       return;
     }
     
@@ -1917,7 +1917,7 @@ function sendAdjustPunchGuide(replyToken) {
             action: {
               type: 'uri',
               label: '開啟網頁版',
-              uri: 'https://eric693.github.io/haiya_check_manager/'
+              uri: 'https://eric693.github.io/plump_check_manager/'
             },
             color: '#FF9800'
           }
@@ -2346,7 +2346,7 @@ function sendHelpMessage(replyToken) {
             action: {
               type: 'uri',
               label: '開啟網頁版',
-              uri: 'https://eric693.github.io/haiya_check_manager/'
+              uri: 'https://eric693.github.io/plump_check_manager/'
             }
           }
         ],
@@ -3956,7 +3956,7 @@ function sendOvertimeApplicationGuide(replyToken, userId, employeeName) {
               action: {
                 type: 'uri',
                 label: '📱 開啟網頁版',
-                uri: 'https://eric693.github.io/haiya_check_manager/'
+                uri: 'https://eric693.github.io/plump_check_manager/'
               },
               color: '#FF9800'
             },
@@ -4284,7 +4284,7 @@ function sendMyOvertimeRecords(replyToken, userId, employeeName) {
               action: {
                 type: 'uri',
                 label: '📱 查看完整記錄',
-                uri: 'https://eric693.github.io/haiya_check_manager/'
+                uri: 'https://eric693.github.io/plump_check_manager/'
               }
             }
           ]
@@ -4995,7 +4995,7 @@ function sendMonthlyShifts(replyToken, userId, employeeName) {
               action: {
                 type: 'uri',
                 label: '📱 查看完整排班',
-                uri: 'https://eric693.github.io/haiya_check_manager/'
+                uri: 'https://eric693.github.io/plump_check_manager/'
               }
             }
           ]
@@ -5731,7 +5731,7 @@ function sendLeaveApplicationMenu(replyToken, userId, employeeName) {
               action: {
                 type: 'uri',
                 label: '📱 開啟網頁版申請',
-                uri: 'https://eric693.github.io/haiya_check_manager/'
+                uri: 'https://eric693.github.io/plump_check_manager/'
               },
               color: '#FF9800'
             },
@@ -6071,7 +6071,7 @@ function sendMyLeaveRecords(replyToken, userId, employeeName) {
               action: {
                 type: 'uri',
                 label: '查看完整記錄',
-                uri: 'https://eric693.github.io/haiya_check_manager/'
+                uri: 'https://eric693.github.io/plump_check_manager/'
               }
             },
             {
@@ -6384,7 +6384,7 @@ function sendLeaveBalance(replyToken, userId, employeeName) {
               action: {
                 type: 'uri',
                 label: '📱 查看完整假期資訊',
-                uri: 'https://eric693.github.io/haiya_check_manager/'
+                uri: 'https://eric693.github.io/plump_check_manager/'
               }
             },
             {

@@ -23,10 +23,10 @@ function formatLocalDateTime(d) {
 
 const API_CONFIG = {
   // 正式環境的 API URL
-  apiUrl: "https://script.google.com/macros/s/AKfycbw-10L-9N7Ie0oTpcOtWuzUsLeGj_K-E34-rjKBuiqKk7oPxkGRN8JqALPhuplGc49f/exec",
+  apiUrl: "https://script.google.com/macros/s/AKfycbzMId4SXMM3D2Ml5dDxA-LIvz64t0XdHIRn6onVInbdgPPzV9yc8pvksPPSdy2MgytW7A/exec",
   
   // 新增回呼網址
-  redirectUrl: "https://eric693.github.io/haiya_check_manager/"
+  redirectUrl: "https://eric693.github.io/plump_check_manager/"
   // 你也可以在這裡加入其他設定，例如：
   // timeout: 5000,
   // version: 'v4.6.0'

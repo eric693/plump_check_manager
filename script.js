@@ -12,7 +12,7 @@ let _isPunching = false;
 // 載入語系檔
 async function loadTranslations(lang) {
     try {
-        const res = await fetch(`https://eric693.github.io/Allianz_check_manager/i18n/${lang}.json`);
+        const res = await fetch(`https://eric693.github.io/plump_check_manager/i18n/${lang}.json`);
         if (!res.ok) {
             throw new Error(`HTTP 錯誤: ${res.status}`);
         }
@@ -2428,7 +2428,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     logoutBtn.onclick = () => {
         localStorage.removeItem("sessionToken");
-        window.location.href = "/Allianz_check_manager"
+        window.location.href = "/plump_check_manager"
     };
     
     /* ===== 打卡功能 ===== */
