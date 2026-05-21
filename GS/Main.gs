@@ -34,6 +34,10 @@ function doGet(e) {
       // ==================== 打卡系統 ====================
       case "punch":
         return respond1(handlePunch(e.parameter));
+      case "punchWifi":
+        return respond1(handlePunchWifi(e.parameter));
+      case "getWifiLocations":
+        return respond1(handleGetWifiLocations(e.parameter));
       case "adjustPunch":
         return respond1(handleAdjustPunch(e.parameter));
       case "getAbnormalRecords":

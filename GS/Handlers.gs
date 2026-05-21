@@ -360,8 +360,8 @@ function handleGetAttendanceDetails(params) {
 // ==================== 地點管理相關 ====================
 
 function handleAddLocation(params) {
-  const { name, lat, lng } = params;
-  return addLocation(name, lat, lng);
+  const { name, lat, lng, radius, wifiSsid, punchMode } = params;
+  return addLocation(name, lat, lng, radius, wifiSsid, punchMode);
 }
 
 function handleGetLocation() {
@@ -370,6 +370,23 @@ function handleGetLocation() {
 
 function handleGetLocations() {
   return getLocation();
+}
+
+function handlePunchWifi(params) {
+  const { token, type, ssid, clientIp, note } = params;
+  if (!token || !type || !ssid) {
+    return { ok: false, code: "ERR_MISSING_PARAMS", msg: "缺少必要參數 (token/type/ssid)" };
+  }
+  return punchWifi(token, type, ssid, clientIp || '', note);
+}
+
+function handleGetWifiLocations(params) {
+  const res = getLocation();
+  if (!res.ok) return res;
+  const wifiLocs = res.locations.filter(
+    loc => loc.wifiSsid && (loc.punchMode === 'WiFi' || loc.punchMode === 'GPS+WiFi')
+  );
+  return { ok: true, locations: wifiLocs };
 }
 
 // ==================== 員工管理相關 ====================

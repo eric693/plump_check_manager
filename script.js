@@ -2181,40 +2181,54 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     // 處理新增打卡地點
     document.getElementById('add-location-btn').addEventListener('click', async () => {
-        const name = document.getElementById('location-name').value;
-        const lat = document.getElementById('location-lat').value;
-        const lng = document.getElementById('location-lng').value;
-        const radius = document.getElementById('location-radius').value; // 新增
-        
-        if (!name || !lat || !lng) {
+        const name      = document.getElementById('location-name').value;
+        const lat       = document.getElementById('location-lat').value;
+        const lng       = document.getElementById('location-lng').value;
+        const radius    = document.getElementById('location-radius').value;
+        const wifiSsid  = (document.getElementById('location-wifi-ssid')?.value || '').trim();
+        const punchMode = document.getElementById('location-punch-mode')?.value || 'GPS+WiFi';
+        const officeIp  = (document.getElementById('location-office-ip')?.value || '').trim();
+
+        // WiFi 模式不需要 GPS 座標，但 GPS 模式需要
+        if (punchMode !== 'WiFi' && (!lat || !lng)) {
             showNotification("請填寫所有欄位並取得位置", "error");
             return;
         }
-        
+        if (!name) {
+            showNotification("請填寫地點名稱", "error");
+            return;
+        }
+
         try {
-            // 加入 radius 參數
-            const res = await callApifetch(`addLocation&name=${encodeURIComponent(name)}&lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&radius=${radius}`);
+            const res = await callApifetch(
+                `addLocation&name=${encodeURIComponent(name)}` +
+                `&lat=${encodeURIComponent(lat || 0)}&lng=${encodeURIComponent(lng || 0)}` +
+                `&radius=${radius}&wifiSsid=${encodeURIComponent(wifiSsid)}&punchMode=${encodeURIComponent(punchMode)}&officeIp=${encodeURIComponent(officeIp)}`
+            );
             if (res.ok) {
                 showNotification("地點新增成功！", "success");
-                
-                // 清空輸入欄位
+
                 document.getElementById('location-name').value = '';
                 document.getElementById('location-lat').value = '';
                 document.getElementById('location-lng').value = '';
-                document.getElementById('location-search').value = ''; // 新增
-                document.getElementById('location-radius').value = 200; // 新增
-                document.getElementById('radius-value').textContent = '200'; // 新增
-                
-                // 重設按鈕狀態
+                document.getElementById('location-search').value = '';
+                document.getElementById('location-radius').value = 200;
+                document.getElementById('radius-value').textContent = '200';
+                if (document.getElementById('location-wifi-ssid')) document.getElementById('location-wifi-ssid').value = '';
+                if (document.getElementById('location-punch-mode')) document.getElementById('location-punch-mode').value = 'GPS+WiFi';
+                if (document.getElementById('location-office-ip')) document.getElementById('location-office-ip').value = '';
+
                 getLocationBtn.textContent = '取得當前位置';
                 getLocationBtn.disabled = false;
                 addLocationBtn.disabled = true;
-                
-                // 新增：清除地圖上的圓形
+
                 if (circle) {
                     mapInstance.removeLayer(circle);
                     circle = null;
                 }
+
+                // 重新載入 WiFi 打卡選項
+                await loadWifiPunchOptions();
             } else {
                 showNotification("新增地點失敗：" + res.msg, "error");
             }
@@ -2510,6 +2524,107 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     punchInBtn.addEventListener('click', () => doPunch("上班"));
     punchOutBtn.addEventListener('click', () => doPunch("下班"));
+
+    // ==================== WiFi 打卡 ====================
+    let _wifiLocations = [];
+
+    /**
+     * 從後端取得 WiFi 打卡地點清單，並根據結果顯示/隱藏 WiFi 打卡區
+     */
+    async function loadWifiPunchOptions() {
+        try {
+            const res = await callApifetch("getWifiLocations");
+            const wifiSection  = document.getElementById('wifi-punch-section');
+            const ssidWrap     = document.getElementById('wifi-ssid-select-wrap');
+            const ssidSelect   = document.getElementById('wifi-ssid-select');
+            const ssidHint     = document.getElementById('wifi-ssid-hint');
+
+            if (!wifiSection) return;
+
+            if (!res.ok || !res.locations || res.locations.length === 0) {
+                wifiSection.classList.add('hidden');
+                return;
+            }
+
+            _wifiLocations = res.locations;
+
+            // 填入 SSID 下拉選單
+            if (ssidSelect) {
+                ssidSelect.innerHTML = '<option value="">-- 請選擇您目前連線的 WiFi --</option>';
+                _wifiLocations.forEach(loc => {
+                    const opt = document.createElement('option');
+                    opt.value = loc.wifiSsid;
+                    opt.textContent = `${loc.name}（${loc.wifiSsid}）`;
+                    ssidSelect.appendChild(opt);
+                });
+            }
+
+            // 若只有一個 WiFi 地點，直接顯示名稱提示
+            if (_wifiLocations.length === 1) {
+                if (ssidHint) ssidHint.textContent = `— ${_wifiLocations[0].name}（${_wifiLocations[0].wifiSsid}）`;
+                if (ssidWrap) ssidWrap.classList.add('hidden');
+                if (ssidSelect) ssidSelect.value = _wifiLocations[0].wifiSsid;
+            } else {
+                if (ssidHint) ssidHint.textContent = '';
+                if (ssidWrap) ssidWrap.classList.remove('hidden');
+            }
+
+            wifiSection.classList.remove('hidden');
+        } catch (err) {
+            console.error('loadWifiPunchOptions error:', err);
+        }
+    }
+
+    /**
+     * 執行 WiFi 打卡
+     */
+    async function doPunchWifi(type) {
+        const ssidSelect = document.getElementById('wifi-ssid-select');
+        const ssid = (ssidSelect?.value || '').trim();
+
+        if (!ssid) {
+            showNotification('請先選擇您目前連線的 WiFi 網路', 'warning');
+            return;
+        }
+
+        const btnId = type === '上班' ? 'wifi-punch-in-btn' : 'wifi-punch-out-btn';
+        const button = document.getElementById(btnId);
+        if (button) { button.disabled = true; button.textContent = '處理中...'; }
+
+        try {
+            const token = localStorage.getItem('sessionToken');
+
+            // 取得公網 IP（用於後端 IP 驗證，失敗時以空字串繼續）
+            let clientIp = '';
+            try {
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                clientIp = ipData.ip || '';
+            } catch (_) { /* ignore, proceed without IP */ }
+
+            const res = await callApifetch(
+                `punchWifi&token=${encodeURIComponent(token)}&type=${encodeURIComponent(type)}&ssid=${encodeURIComponent(ssid)}&clientIp=${encodeURIComponent(clientIp)}&note=${encodeURIComponent(navigator.userAgent)}`
+            );
+            const msg = t(res.code || 'UNKNOWN_ERROR', res.params || {});
+            showNotification(msg || (res.ok ? `WiFi ${type}打卡成功` : res.msg), res.ok ? 'success' : 'error');
+        } catch (err) {
+            console.error('doPunchWifi error:', err);
+            showNotification('WiFi 打卡失敗', 'error');
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = `WiFi ${type}打卡`;
+            }
+        }
+    }
+
+    const wifiInBtn  = document.getElementById('wifi-punch-in-btn');
+    const wifiOutBtn = document.getElementById('wifi-punch-out-btn');
+    if (wifiInBtn)  wifiInBtn.addEventListener('click', () => doPunchWifi('上班'));
+    if (wifiOutBtn) wifiOutBtn.addEventListener('click', () => doPunchWifi('下班'));
+
+    // 登入後載入 WiFi 選項（也可以在 initAfterLogin 中呼叫）
+    loadWifiPunchOptions().catch(() => {});
 
     // 處理補打卡表單
     abnormalList.addEventListener('click', (e) => {

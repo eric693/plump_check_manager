@@ -1116,24 +1116,46 @@ function testGetApprovedOvertimeRecords() {
 // ==================== 地點管理 ====================
 /**
  * 新增打卡地點
- * @param {string} name - 地點名稱
- * @param {number} lat - 緯度
- * @param {number} lng - 經度
- * @param {number} radius - 打卡範圍（公尺），預設 200，範圍 30-2000
+ * @param {string} name       - 地點名稱
+ * @param {number} lat        - 緯度（WiFi 模式可傳 0）
+ * @param {number} lng        - 經度（WiFi 模式可傳 0）
+ * @param {number} radius     - GPS 打卡範圍（公尺），預設 200
+ * @param {string} wifiSsid   - WiFi SSID（選填）
+ * @param {string} punchMode  - 打卡方式：GPS / WiFi / GPS+WiFi（預設 GPS+WiFi）
+ * @param {string} officeIp   - 辦公室公網 IP（選填，用於 IP 驗證）
  */
-function addLocation(name, lat, lng, radius) {
-  if (!name || !lat || !lng) {
+function addLocation(name, lat, lng, radius, wifiSsid, punchMode, officeIp) {
+  if (!name) {
     return { ok: false, code: "ERR_INVALID_INPUT" };
   }
-  
-  // 驗證 radius 參數，確保在合理範圍內
+
   const validRadius = radius && !isNaN(radius) ? parseInt(radius) : 200;
-  const finalRadius = Math.max(30, Math.min(2000, validRadius)); // 限制在 30-2000 之間
-  
+  const finalRadius = Math.max(30, Math.min(2000, validRadius));
+  const finalSsid   = (wifiSsid  || '').trim();
+  const finalIp     = (officeIp  || '').trim();
+  const finalMode   = ['GPS', 'WiFi', 'GPS+WiFi'].includes(punchMode) ? punchMode : 'GPS+WiFi';
+
+  if (finalMode !== 'WiFi' && (!lat || !lng)) {
+    return { ok: false, code: "ERR_INVALID_INPUT" };
+  }
+
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET_LOCATIONS);
-  sh.appendRow(["", name, lat, lng, finalRadius]);
-  
-  Logger.log(`✅ 新增地點：${name}，範圍：${finalRadius}公尺`);
+
+  // 舊資料表自動升級標題行
+  const headerRow = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  if (!headerRow.includes('WiFi SSID')) {
+    const c = sh.getLastColumn();
+    sh.getRange(1, c + 1).setValue('WiFi SSID');
+    sh.getRange(1, c + 2).setValue('打卡方式');
+    sh.getRange(1, c + 3).setValue('辦公室IP');
+  } else if (!headerRow.includes('辦公室IP')) {
+    const c = sh.getLastColumn();
+    sh.getRange(1, c + 1).setValue('辦公室IP');
+  }
+
+  sh.appendRow(["", name, lat || 0, lng || 0, finalRadius, finalSsid, finalMode, finalIp]);
+
+  Logger.log(`✅ 新增地點：${name}，模式：${finalMode}，SSID：${finalSsid}，IP：${finalIp || '未設定'}`);
   return { ok: true, code: "LOCATION_ADD_SUCCESS" };
 }
 
@@ -1141,25 +1163,150 @@ function addLocation(name, lat, lng, radius) {
  * 取得所有打卡地點
  */
 function getLocation() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOCATIONS);
+  const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOCATIONS);
   const values = sheet.getDataRange().getValues();
-  
-  if (values.length === 0) {
-    return { ok: true, locations: [] };
-  }
-  
-  const headers = values.shift();
+
+  if (values.length === 0) return { ok: true, locations: [] };
+
+  const headers  = values.shift();
+  const ssidIdx  = headers.indexOf('WiFi SSID');
+  const modeIdx  = headers.indexOf('打卡方式');
+  const ipIdx    = headers.indexOf('辦公室IP');
+
   const locations = values
     .filter(row => row[1])
     .map(row => ({
-      id: row[headers.indexOf('ID')] || '',
-      name: row[headers.indexOf('地點名稱')] || '',
-      lat: row[headers.indexOf('GPS(緯度)')] || 0,
-      lng: row[headers.indexOf('GPS(經度)')] || 0,
-      scope: row[headers.indexOf('容許誤差(公尺)')] || 100
+      id:        row[headers.indexOf('ID')] || '',
+      name:      row[headers.indexOf('地點名稱')] || '',
+      lat:       row[headers.indexOf('GPS(緯度)')] || 0,
+      lng:       row[headers.indexOf('GPS(經度)')] || 0,
+      scope:     row[headers.indexOf('容許誤差(公尺)')] || 100,
+      wifiSsid:  ssidIdx >= 0 ? (row[ssidIdx] || '') : '',
+      punchMode: modeIdx >= 0 ? (row[modeIdx] || 'GPS+WiFi') : 'GPS+WiFi',
+      officeIp:  ipIdx   >= 0 ? (row[ipIdx]   || '') : ''
     }));
-  
+
   return { ok: true, locations: locations };
+}
+
+/**
+ * 以 WiFi SSID ＋ IP 驗證打卡地點
+ * @param {string} ssid      - 員工回報的 WiFi SSID
+ * @param {string} clientIp  - 員工前端偵測到的公網 IP（選填）
+ * @returns {{ valid: boolean, locationName: string, reason: string }}
+ */
+function checkPunchWifi(ssid, clientIp) {
+  try {
+    if (!ssid || ssid.trim() === '') {
+      return { valid: false, reason: '未提供 WiFi SSID' };
+    }
+
+    const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOCATIONS);
+    const values = sheet.getDataRange().getValues();
+    if (values.length < 2) {
+      return { valid: false, reason: '系統尚未設定打卡地點' };
+    }
+
+    const headers = values[0];
+    const ssidIdx = headers.indexOf('WiFi SSID');
+    const modeIdx = headers.indexOf('打卡方式');
+    const nameIdx = headers.indexOf('地點名稱');
+    const ipIdx   = headers.indexOf('辦公室IP');
+
+    if (ssidIdx < 0) {
+      return { valid: false, reason: '地點表尚未設定 WiFi SSID 欄位，請管理員重新新增地點' };
+    }
+
+    const trimSsid     = ssid.trim();
+    const trimClientIp = (clientIp || '').trim();
+
+    for (let i = 1; i < values.length; i++) {
+      const row      = values[i];
+      const locSsid  = String(row[ssidIdx] || '').trim();
+      const locMode  = modeIdx >= 0 ? String(row[modeIdx] || 'GPS+WiFi') : 'GPS+WiFi';
+      const locName  = String(row[nameIdx] || '');
+      const locIp    = ipIdx   >= 0 ? String(row[ipIdx]   || '').trim() : '';
+
+      // SSID 不符合 → 跳過
+      if (!locSsid || locSsid !== trimSsid) continue;
+      // 打卡方式不含 WiFi → 跳過
+      if (locMode !== 'WiFi' && locMode !== 'GPS+WiFi') continue;
+
+      // SSID 符合，再做 IP 驗證
+      if (locIp) {
+        // 管理員有設定辦公室 IP → 必須比對
+        if (!trimClientIp) {
+          return { valid: false, reason: '此地點已啟用 IP 驗證，LINE Bot 無法取得網路 IP，請改用網頁版進行 WiFi 打卡', requiresWebApp: true };
+        }
+        // 支援多個 IP（逗號分隔）
+        const allowedIps = locIp.split(',').map(s => s.trim()).filter(Boolean);
+        if (!allowedIps.includes(trimClientIp)) {
+          return {
+            valid: false,
+            reason: `IP 驗證失敗：您目前的網路（${trimClientIp}）不符合公司網路，請確認已連線公司 WiFi`
+          };
+        }
+      }
+      // 通過所有驗證
+      return { valid: true, locationName: locName };
+    }
+
+    return { valid: false, reason: '您所在的 WiFi 不在允許打卡的網路清單中' };
+  } catch (e) {
+    Logger.log('❌ checkPunchWifi 錯誤: ' + e);
+    return { valid: false, reason: '系統錯誤' };
+  }
+}
+
+/**
+ * WiFi 打卡
+ * @param {string} sessionToken
+ * @param {string} type      - 上班 / 下班
+ * @param {string} ssid      - WiFi SSID
+ * @param {string} clientIp  - 員工公網 IP（前端偵測）
+ * @param {string} note      - 備註（通常為裝置資訊）
+ */
+function punchWifi(sessionToken, type, ssid, clientIp, note) {
+  const employee = checkSession_(sessionToken);
+  const user = employee.user;
+  if (!user) return { ok: false, code: "ERR_SESSION_INVALID" };
+
+  const wifiCheck = checkPunchWifi(ssid, clientIp);
+  if (!wifiCheck.valid) {
+    return { ok: false, code: "ERR_WIFI_NOT_ALLOWED", msg: wifiCheck.reason };
+  }
+
+  // 防重複：同一天同類型只能打一次
+  const sh     = SpreadsheetApp.getActive().getSheetByName(SHEET_ATTENDANCE);
+  const today  = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const rows   = sh.getDataRange().getValues();
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[0]) continue;
+    const rowDate   = Utilities.formatDate(new Date(row[0]), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    const rowUserId = String(row[1]).trim();
+    const rowType   = String(row[4]).trim();
+    const rowNote   = String(row[7] || '').trim();
+    if (rowNote === '補打卡') continue;
+    if (rowDate === today && rowUserId === user.userId && rowType === type) {
+      return { ok: false, code: "ERR_DUPLICATE_PUNCH", msg: '今天已經打過' + type + '卡，請勿重複打卡' };
+    }
+  }
+
+  const ipNote = clientIp ? `（IP:${clientIp}）` : '';
+  sh.appendRow([
+    new Date(), user.userId, user.dept, user.name,
+    type,
+    'WiFi:' + ssid,
+    wifiCheck.locationName,
+    'WiFi打卡' + ipNote,
+    '',
+    note || ''
+  ]);
+
+  Logger.log('WiFi打卡成功: ' + user.name + ' - ' + type + ' SSID:' + ssid + ' IP:' + (clientIp || '-'));
+  return { ok: true, code: "PUNCH_SUCCESS", params: { type: type } };
 }
 
 // ==================== 審核功能 ====================

@@ -22,11 +22,34 @@ function handleLineMessage(event) {
     
     if (text === '上班打卡') {
       savePunchIntent_(userId, '上班');
-      sendQuickReplyLocationRequest(replyToken, employee.name, '上班');
-    } 
+      sendPunchMethodSelector(replyToken, employee.name, '上班');
+    }
     else if (text === '下班打卡') {
       savePunchIntent_(userId, '下班');
+      sendPunchMethodSelector(replyToken, employee.name, '下班');
+    }
+    // GPS 打卡（從選擇器點擊後發送）
+    else if (text === 'GPS上班打卡') {
+      savePunchIntent_(userId, '上班');
+      sendQuickReplyLocationRequest(replyToken, employee.name, '上班');
+    }
+    else if (text === 'GPS下班打卡') {
+      savePunchIntent_(userId, '下班');
       sendQuickReplyLocationRequest(replyToken, employee.name, '下班');
+    }
+    // WiFi 打卡選單
+    else if (text === 'WiFi上班打卡') {
+      savePunchIntent_(userId, '上班');
+      sendWifiNetworkSelector(replyToken, employee.name, '上班');
+    }
+    else if (text === 'WiFi下班打卡') {
+      savePunchIntent_(userId, '下班');
+      sendWifiNetworkSelector(replyToken, employee.name, '下班');
+    }
+    // WiFi 打卡確認（格式: "WiFi打卡:SSID名稱"）
+    else if (text.startsWith('WiFi打卡:')) {
+      const ssid = text.replace('WiFi打卡:', '').trim();
+      handleLineWifiPunch(replyToken, userId, employee.name, ssid);
     }
     else if (text === '取消打卡') {
       clearPunchIntent_(userId);
@@ -86,7 +109,7 @@ function handleLineMessage(event) {
       sendPendingLeaveRequests(replyToken, userId, employee.name);
     }
     else {
-      replyMessage(replyToken, '💡 我不太明白您的意思\n\n請輸入：\n• 上班打卡\n• 下班打卡\n• 查詢\n• 說明');
+      replyMessage(replyToken, '💡 我不太明白您的意思\n\n請輸入：\n• 上班打卡\n• 下班打卡\n• 查詢\n• 說明\n\nGPS 打卡：\n• GPS上班打卡\n• GPS下班打卡\n\nWiFi 打卡：\n• WiFi上班打卡\n• WiFi下班打卡');
     }
     
   } catch (error) {
@@ -7183,11 +7206,310 @@ function sendMonthlyRecords(replyToken, userId, employeeName, yearMonth) {
       
       replyMessage(replyToken, simpleText);
     }
-    
+
     Logger.log('✅ 月份打卡記錄已發送');
-    
+
   } catch (error) {
     Logger.log('❌ sendMonthlyRecords 錯誤: ' + error);
     replyMessage(replyToken, '❌ 查詢失敗，請稍後再試');
   }
+}
+
+// ==================== WiFi 打卡相關函數 ====================
+
+/**
+ * 發送打卡方式選擇器（GPS / WiFi）
+ */
+function sendPunchMethodSelector(replyToken, employeeName, punchType) {
+  const color = punchType === '上班' ? '#4CAF50' : '#FF9800';
+  const message = {
+    type: 'flex',
+    altText: `選擇${punchType}打卡方式`,
+    contents: {
+      type: 'bubble',
+      size: 'kilo',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [{
+          type: 'text',
+          text: `${punchType}打卡`,
+          weight: 'bold',
+          size: 'xl',
+          color: '#FFFFFF'
+        }],
+        backgroundColor: color,
+        paddingAll: '16px'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: `${employeeName}，請選擇打卡方式：`,
+            size: 'sm',
+            color: '#555555',
+            wrap: true
+          },
+          {
+            type: 'button',
+            style: 'primary',
+            height: 'sm',
+            color: '#2196F3',
+            action: {
+              type: 'message',
+              label: '📍 GPS 定位打卡',
+              text: 'GPS' + punchType + '打卡'
+            }
+          },
+          {
+            type: 'button',
+            style: 'primary',
+            height: 'sm',
+            color: '#009688',
+            action: {
+              type: 'message',
+              label: '📶 WiFi 打卡',
+              text: 'WiFi' + punchType + '打卡'
+            }
+          },
+          {
+            type: 'button',
+            style: 'link',
+            height: 'sm',
+            action: {
+              type: 'message',
+              label: '取消',
+              text: '取消打卡'
+            }
+          }
+        ]
+      }
+    }
+  };
+  sendLineReply_(replyToken, [message]);
+}
+
+/**
+ * 取得所有支援 WiFi 的打卡地點 SSID 清單
+ */
+function getWifiLocations_() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOCATIONS);
+    const values = sheet.getDataRange().getValues();
+    if (values.length < 2) return [];
+
+    const headers = values[0];
+    const ssidIdx = headers.indexOf('WiFi SSID');
+    const modeIdx = headers.indexOf('打卡方式');
+    const nameIdx = headers.indexOf('地點名稱');
+    if (ssidIdx < 0) return [];
+
+    const results = [];
+    for (let i = 1; i < values.length; i++) {
+      const row  = values[i];
+      const ssid = String(row[ssidIdx] || '').trim();
+      const mode = modeIdx >= 0 ? String(row[modeIdx] || 'GPS+WiFi') : 'GPS+WiFi';
+      const name = String(row[nameIdx] || '');
+      if (ssid && (mode === 'WiFi' || mode === 'GPS+WiFi')) {
+        results.push({ ssid, name });
+      }
+    }
+    return results;
+  } catch (e) {
+    Logger.log('❌ getWifiLocations_ 錯誤: ' + e);
+    return [];
+  }
+}
+
+/**
+ * 發送 WiFi 網路選擇器
+ */
+function sendWifiNetworkSelector(replyToken, employeeName, punchType) {
+  const wifiLocations = getWifiLocations_();
+
+  if (wifiLocations.length === 0) {
+    replyMessage(replyToken,
+      '⚠️ 系統尚未設定任何 WiFi 打卡地點\n\n請聯絡管理員在後台新增 WiFi SSID 後再試。\n\n也可改用 GPS 打卡：\n• GPS' + punchType + '打卡'
+    );
+    return;
+  }
+
+  const buttons = wifiLocations.map(loc => ({
+    type: 'button',
+    style: 'primary',
+    height: 'sm',
+    color: '#009688',
+    action: {
+      type: 'message',
+      label: '📶 ' + loc.name + ' (' + loc.ssid + ')',
+      text: 'WiFi打卡:' + loc.ssid
+    }
+  }));
+
+  const displayButtons = buttons.slice(0, 13);
+  displayButtons.push({
+    type: 'button',
+    style: 'link',
+    height: 'sm',
+    action: {
+      type: 'message',
+      label: '取消',
+      text: '取消打卡'
+    }
+  });
+
+  const message = {
+    type: 'flex',
+    altText: '選擇 WiFi 網路打卡',
+    contents: {
+      type: 'bubble',
+      size: 'kilo',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [{
+          type: 'text',
+          text: '📶 WiFi ' + punchType + '打卡',
+          weight: 'bold',
+          size: 'lg',
+          color: '#FFFFFF'
+        }],
+        backgroundColor: '#009688',
+        paddingAll: '16px'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'text',
+            text: employeeName + '，請確認您目前連線的 WiFi 網路：',
+            size: 'sm',
+            color: '#555555',
+            wrap: true,
+            margin: 'sm'
+          },
+          { type: 'separator', margin: 'md' },
+          ...displayButtons
+        ]
+      }
+    }
+  };
+  sendLineReply_(replyToken, [message]);
+}
+
+/**
+ * 處理 LINE WiFi 打卡邏輯
+ */
+function handleLineWifiPunch(replyToken, userId, employeeName, ssid) {
+  try {
+    Logger.log('📶 LINE WiFi 打卡: userId=' + userId + ', ssid=' + ssid);
+
+    const employee = findEmployeeByLineUserId_(userId);
+    if (!employee.ok) {
+      replyMessage(replyToken, '❌ 員工資料找不到');
+      return;
+    }
+
+    const punchType = getPunchIntent_(userId);
+    if (!punchType) {
+      replyMessage(replyToken, '⚠️ 打卡意圖已過期（5分鐘限制），請重新輸入「上班打卡」或「下班打卡」。');
+      return;
+    }
+
+    const wifiCheck = checkPunchWifi(ssid);
+    if (!wifiCheck.valid) {
+      const hint = wifiCheck.requiresWebApp
+        ? '\n\n📱 此地點需要 IP 驗證，請開啟打卡網頁進行 WiFi 打卡，或改用 GPS 打卡。'
+        : '\n\n請確認您已連線到公司 WiFi，或改用 GPS 打卡。';
+      replyMessage(replyToken, '❌ WiFi 打卡失敗\n\n原因：' + wifiCheck.reason + hint);
+      clearPunchIntent_(userId);
+      return;
+    }
+
+    if (isDuplicatePunch_(userId, punchType)) {
+      replyMessage(replyToken, '⚠️ 您剛剛已經打過卡了，請勿重複操作');
+      clearPunchIntent_(userId);
+      return;
+    }
+
+    const sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_ATTENDANCE);
+    const now  = new Date();
+    const time = Utilities.formatDate(now, 'Asia/Taipei', 'HH:mm:ss');
+
+    sheet.appendRow([
+      now, userId, employee.dept, employee.name,
+      punchType, 'WiFi:' + ssid, wifiCheck.locationName,
+      'WiFi打卡', '', 'LINE Bot (WiFi)'
+    ]);
+
+    clearPunchIntent_(userId);
+
+    sendLineReply_(replyToken, [{
+      type: 'flex',
+      altText: '✅ WiFi 打卡成功',
+      contents: createWifiPunchSuccessMessage(employeeName, punchType, time, wifiCheck.locationName, ssid)
+    }]);
+    Logger.log('✅ LINE WiFi 打卡成功: ' + employee.name + ' - ' + punchType);
+
+  } catch (error) {
+    Logger.log('❌ handleLineWifiPunch 錯誤: ' + error);
+    replyMessage(replyToken, '❌ 系統錯誤，請稍後再試');
+  }
+}
+
+/**
+ * 建立 WiFi 打卡成功訊息 (Flex Bubble)
+ */
+function createWifiPunchSuccessMessage(employeeName, punchType, time, locationName, ssid) {
+  return {
+    type: 'bubble',
+    size: 'mega',
+    header: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [{ type: 'text', text: '✅ WiFi 打卡成功', weight: 'bold', size: 'xl', color: '#FFFFFF' }],
+      backgroundColor: '#4CAF50',
+      paddingAll: '20px'
+    },
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        { type: 'text', text: employeeName + '，打卡成功！', size: 'lg', weight: 'bold', margin: 'md' },
+        { type: 'separator', margin: 'lg' },
+        {
+          type: 'box', layout: 'vertical', margin: 'lg', spacing: 'sm',
+          contents: [
+            { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+              { type: 'text', text: '類型', color: '#999999', size: 'sm', flex: 2 },
+              { type: 'text', text: punchType, color: '#4CAF50', size: 'md', flex: 5, weight: 'bold' }
+            ]},
+            { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+              { type: 'text', text: '時間', color: '#999999', size: 'sm', flex: 2 },
+              { type: 'text', text: time, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+            ]},
+            { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+              { type: 'text', text: '地點', color: '#999999', size: 'sm', flex: 2 },
+              { type: 'text', text: locationName, color: '#333333', size: 'sm', flex: 5 }
+            ]},
+            { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+              { type: 'text', text: '網路', color: '#999999', size: 'sm', flex: 2 },
+              { type: 'text', text: '📶 ' + ssid, color: '#009688', size: 'sm', flex: 5 }
+            ]}
+          ]
+        },
+        { type: 'separator', margin: 'lg' },
+        {
+          type: 'text',
+          text: punchType === '上班' ? '💪 祝您今天工作順利！' : '🎉 辛苦了，下班愉快！',
+          size: 'sm', color: '#4CAF50', margin: 'lg', align: 'center', weight: 'bold'
+        }
+      ]
+    }
+  };
 }
