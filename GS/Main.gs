@@ -524,34 +524,15 @@ function doPost(e) {
   }
 }
 
-function isEventProcessed_(eventId) {
-  const cache = CacheService.getScriptCache();
-  const key = 'event_' + eventId;
-  
-  const cached = cache.get(key);
-  if (cached) {
-    return true;
-  }
-  
-  cache.put(key, 'processed', 3600);
-  return false;
-}
 /**
- * ✅ 檢查事件是否已處理（去重機制）
+ * 檢查事件是否已處理（去重機制，有效期 1 小時）
  */
 function isEventProcessed_(eventId) {
   const cache = CacheService.getScriptCache();
   const key = 'event_' + eventId;
-  
-  // 檢查快取中是否有這個事件
-  const cached = cache.get(key);
-  if (cached) {
-    return true;  // 已處理過
-  }
-  
-  // 標記為已處理（有效期 1 小時）
+  if (cache.get(key)) return true;
   cache.put(key, 'processed', 3600);
-  return false;  // 第一次處理
+  return false;
 }
 
 

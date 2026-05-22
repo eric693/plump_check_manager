@@ -1310,18 +1310,19 @@ function checkPunchLocation(lat, lng) {
       };
     }
     
-    const locations = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
-    
+    // 讀取 7 欄以取得 punchMode（欄序：ID, 地點名稱, 緯度, 經度, 半徑, WiFi SSID, 打卡方式）
+    const locations = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+
     let nearestLocation = null;
     let minDistance = Infinity;
     let validLocation = null;
-    
-    for (let [, name, locLat, locLng, radius] of locations) {
+
+    for (let [, name, locLat, locLng, radius, , punchMode] of locations) {
       if (!name || !locLat || !locLng) continue;
-      
+
       const distance = getDistanceMeters_(lat, lng, Number(locLat), Number(locLng));
-      
-      // 記錄最近的地點
+
+      // 記錄最近的地點（不論打卡方式，方便提示距離）
       if (distance < minDistance) {
         minDistance = distance;
         nearestLocation = {
@@ -1329,7 +1330,11 @@ function checkPunchLocation(lat, lng) {
           distance: Math.round(distance)
         };
       }
-      
+
+      // WiFi-only 地點不可用 GPS 打卡
+      const mode = String(punchMode || 'GPS+WiFi').trim();
+      if (mode === 'WiFi') continue;
+
       // 檢查是否在範圍內
       if (distance <= Number(radius)) {
         validLocation = {
@@ -7219,9 +7224,53 @@ function sendMonthlyRecords(replyToken, userId, employeeName, yearMonth) {
 
 /**
  * 發送打卡方式選擇器（GPS / WiFi）
+ * 依地點設定的打卡方式動態顯示可用按鈕
  */
 function sendPunchMethodSelector(replyToken, employeeName, punchType) {
+  const availability = getPunchMethodAvailability_();
   const color = punchType === '上班' ? '#4CAF50' : '#FF9800';
+
+  const methodButtons = [];
+
+  if (availability.hasGps) {
+    methodButtons.push({
+      type: 'button',
+      style: 'primary',
+      height: 'sm',
+      color: '#2196F3',
+      action: {
+        type: 'message',
+        label: 'GPS 定位打卡',
+        text: 'GPS' + punchType + '打卡'
+      }
+    });
+  }
+
+  if (availability.hasWifi) {
+    methodButtons.push({
+      type: 'button',
+      style: 'primary',
+      height: 'sm',
+      color: '#009688',
+      action: {
+        type: 'message',
+        label: 'WiFi 打卡',
+        text: 'WiFi' + punchType + '打卡'
+      }
+    });
+  }
+
+  methodButtons.push({
+    type: 'button',
+    style: 'link',
+    height: 'sm',
+    action: {
+      type: 'message',
+      label: '取消',
+      text: '取消打卡'
+    }
+  });
+
   const message = {
     type: 'flex',
     altText: `選擇${punchType}打卡方式`,
@@ -7253,38 +7302,7 @@ function sendPunchMethodSelector(replyToken, employeeName, punchType) {
             color: '#555555',
             wrap: true
           },
-          {
-            type: 'button',
-            style: 'primary',
-            height: 'sm',
-            color: '#2196F3',
-            action: {
-              type: 'message',
-              label: '📍 GPS 定位打卡',
-              text: 'GPS' + punchType + '打卡'
-            }
-          },
-          {
-            type: 'button',
-            style: 'primary',
-            height: 'sm',
-            color: '#009688',
-            action: {
-              type: 'message',
-              label: '📶 WiFi 打卡',
-              text: 'WiFi' + punchType + '打卡'
-            }
-          },
-          {
-            type: 'button',
-            style: 'link',
-            height: 'sm',
-            action: {
-              type: 'message',
-              label: '取消',
-              text: '取消打卡'
-            }
-          }
+          ...methodButtons
         ]
       }
     }
@@ -7325,6 +7343,40 @@ function getWifiLocations_() {
 }
 
 /**
+ * 檢查系統中哪些打卡方式有被啟用（依地點設定判斷）
+ */
+function getPunchMethodAvailability_() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOCATIONS);
+    const values = sheet.getDataRange().getValues();
+    if (values.length < 2) return { hasGps: true, hasWifi: false };
+
+    const headers = values[0];
+    const modeIdx = headers.indexOf('打卡方式');
+    const nameIdx = headers.indexOf('地點名稱');
+
+    let hasGps = false;
+    let hasWifi = false;
+
+    for (let i = 1; i < values.length; i++) {
+      const row  = values[i];
+      // nameIdx < 0 表示表頭尚未設定，改用固定欄位 index 1
+      const name = String(row[nameIdx >= 0 ? nameIdx : 1] || '').trim();
+      if (!name) continue;
+      const mode = modeIdx >= 0 ? String(row[modeIdx] || 'GPS+WiFi') : 'GPS+WiFi';
+      if (mode === 'GPS' || mode === 'GPS+WiFi') hasGps = true;
+      if (mode === 'WiFi' || mode === 'GPS+WiFi') hasWifi = true;
+    }
+    // 若仍無任何有效地點，安全降級為 GPS-only
+    if (!hasGps && !hasWifi) return { hasGps: true, hasWifi: false };
+    return { hasGps, hasWifi };
+  } catch (e) {
+    Logger.log('getPunchMethodAvailability_ 錯誤: ' + e);
+    return { hasGps: true, hasWifi: false };
+  }
+}
+
+/**
  * 發送 WiFi 網路選擇器
  */
 function sendWifiNetworkSelector(replyToken, employeeName, punchType) {
@@ -7344,7 +7396,7 @@ function sendWifiNetworkSelector(replyToken, employeeName, punchType) {
     color: '#009688',
     action: {
       type: 'message',
-      label: '📶 ' + loc.name + ' (' + loc.ssid + ')',
+      label: loc.name + ' (' + loc.ssid + ')',
       text: 'WiFi打卡:' + loc.ssid
     }
   }));
@@ -7372,7 +7424,7 @@ function sendWifiNetworkSelector(replyToken, employeeName, punchType) {
         layout: 'vertical',
         contents: [{
           type: 'text',
-          text: '📶 WiFi ' + punchType + '打卡',
+          text: 'WiFi ' + punchType + '打卡',
           weight: 'bold',
           size: 'lg',
           color: '#FFFFFF'
